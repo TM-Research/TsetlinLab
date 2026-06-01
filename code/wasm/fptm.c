@@ -594,6 +594,20 @@ void fptm_scores(uint8_t *x, int *out) {
     }
 }
 
+/* Graded output of EVERY clause for one sample, by global clause id.
+ * out must hold fptm_num_clauses() ints; out[id] = max(clamp - violations, 0).
+ * Lets the UI reconstruct exactly which clauses fired and by how much (the same
+ * per-clause "clauseOut" the JS reference computes) in one WASM call. */
+EXPORT
+void fptm_clause_outputs(uint8_t *x, int *out) {
+    FPTM *m = G;
+    if (!m) return;
+    pack_sample(m, x);
+    for (int id = 0; id < m->total_clauses; id++) {
+        out[id] = check_clause(m, id);
+    }
+}
+
 /* ---------------------------- introspection ------------------------------- */
 
 EXPORT int fptm_num_clauses(void) { return G ? G->total_clauses : 0; }

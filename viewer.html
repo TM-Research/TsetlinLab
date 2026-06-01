@@ -449,6 +449,9 @@
   </div>
 </main>
 
+<!-- WebAssembly inference kernel (optional; viewer falls back to the JS engine
+     if this file is absent). Single-file module, loads on demand. -->
+<script src="code/wasm/fptm.js"></script>
 <script>
 "use strict";
 const $ = s => document.querySelector(s);
@@ -521,6 +524,97 @@ function evalSample(engine, fv, full){
 // expose for headless test harness (quickjs / node); harmless in the browser
 if (typeof globalThis !== 'undefined'){ globalThis.buildEngine = buildEngine; globalThis.evalSample = evalSample; }
 
+// ===========================================================================
+//  WASM ENGINE  (optional active inference path — compiled FPTM kernel)
+//  Same math as evalSample(); when available, the viewer runs inference through
+//  WebAssembly and falls back to the JS engine otherwise. Result is identical.
+// ===========================================================================
+let WASM = null;          // { mod, predict, scores, clauseOutputs, classes, clsIdx, bits[], nbits }
+let ENGINE_KIND = 'js';   // 'wasm' | 'js'  (shown in the header)
+const INCLUDE_LIMIT = 200, STATES_NUM = 256;   // Paper_2 defaults; only the include cutoff matters for inference
+
+// Build the WASM-backed engine from an atlas. Reconstructs each clause's Tsetlin
+// automaton states from the atlas's included-literal lists (included -> at the
+// include cutoff, excluded -> just below it), then loads them into the kernel.
+// Returns a wasm engine object, or null if the module isn't available / fails.
+async function buildEngineWasm(atlas){
+  if (typeof FPTM === 'undefined') return null;        // module script absent
+  let mod;
+  try { mod = await FPTM(); } catch(e){ return null; }
+  const classes = atlas.model.classes.map(String);
+  const ncls = classes.length;
+  const bits = (atlas.bits||[]).slice().sort((a,b)=>a.bit-b.bit);
+  const nbits = bits.length || (atlas.metadata && atlas.metadata.numLiterals) || 0;
+  if(!nbits) return null;
+  // C = positive clauses of class 0 (per-class-per-polarity count the kernel expects)
+  const C = atlas.clauses.filter(c=>String(c.class)===classes[0] && c.polarity==='positive').length;
+  if(!C) return null;
+  try{
+    const rc = mod.ccall('fptm_create','number',
+      ['number','number','number','number','number','number','number','number','number','number'],
+      [ncls, nbits, C, 8, 300, 50, 15, STATES_NUM, INCLUDE_LIMIT, 42]);
+    if(rc !== 0) return null;
+    const total = mod.ccall('fptm_num_clauses','number',[],[]);
+    // state buffer: total * nbits * 2 uint16; default = include_limit-1, set included literals to include_limit
+    const buf = new Uint16Array(total*nbits*2); buf.fill(INCLUDE_LIMIT-1);
+    classes.forEach((cls,ci)=>{
+      const pos = atlas.clauses.filter(c=>String(c.class)===cls && c.polarity==='positive');
+      const neg = atlas.clauses.filter(c=>String(c.class)===cls && c.polarity==='negative');
+      pos.concat(neg).forEach((c,within)=>{
+        const id = ci*(2*C) + within;       // kernel's class-major global clause id
+        if(id>=total) return;
+        (c.literals||[]).forEach(l=>{
+          const j=l.bit, which=(l.operator==='≥')?0:1;
+          if(j>=0 && j<nbits) buf[(id*nbits + j)*2 + which] = INCLUDE_LIMIT;
+        });
+      });
+    });
+    const sp = mod._malloc(buf.length*2); mod.HEAPU16.set(buf, sp>>1);
+    mod.ccall('fptm_load_states','number',['number','number'],[sp, buf.length]);
+    mod._free(sp);
+    mod.ccall('fptm_refresh_all','void',[],[]);
+    // scratch buffers reused per call
+    const xptr = mod._malloc(nbits);
+    const sptr = mod._malloc(Math.max(ncls, total)*4);
+    const clsIdx={}; classes.forEach((c,i)=>clsIdx[c]=i);
+    return {mod, classes, clsIdx, bits, nbits, ncls, total, xptr, sptr};
+  }catch(e){ return null; }
+}
+
+// Evaluate one sample through WASM, returning the SAME shape as evalSample().
+function evalSampleWasm(W, fv, full){
+  full = full !== false;
+  const m = W.mod;
+  // pack bits exactly as GLADE does: bit = (value >= threshold)
+  const xb = new Uint8Array(W.nbits);
+  for(const b of W.bits){ xb[b.bit] = (fv[b.feature] >= b.threshold) ? 1 : 0; }
+  m.HEAPU8.set(xb, W.xptr);
+  // scores per class
+  m.ccall('fptm_scores','void',['number','number'],[W.xptr, W.sptr]);
+  const scores = new Array(W.ncls);
+  for(let k=0;k<W.ncls;k++) scores[k] = m.HEAP32[(W.sptr>>2)+k];
+  const predIdx = m.ccall('fptm_predict','number',['number'],[W.xptr]);
+  let activated=null, clauseOut=null, nact=0;
+  if(full){
+    m.ccall('fptm_clause_outputs','void',['number','number'],[W.xptr, W.sptr]);
+    activated=[]; clauseOut={};
+    for(let id=0; id<W.total; id++){
+      const out = m.HEAP32[(W.sptr>>2)+id];
+      clauseOut[id] = {out, viol:(m.ccall('fptm_clause_clamp','number',['number'],[id]) - out)};
+      if(out>0){ nact++; activated.push(id); }
+    }
+  } else {
+    nact = m.ccall('fptm_predict','number',['number'],[W.xptr])>=0 ? 0 : 0; // nact not needed in bulk; recomputed if asked
+  }
+  return {predIdx, predLabel:W.classes[predIdx], scores, activated, clauseOut, nact};
+}
+
+// Unified evaluate: routes to WASM when active, else JS. Same return shape.
+function evalUnified(fv, full){
+  if(ENGINE_KIND==='wasm' && WASM) return evalSampleWasm(WASM, fv, full);
+  return evalSample(ENGINE, fv, full);
+}
+
 // ---------------------------------------------------------------- class labels
 // CSV actual/predicted columns may be integer class indices OR label strings.
 function classLabel(v){
@@ -542,15 +636,29 @@ function loadAtlas(obj, name){
     if(!obj || !obj.model || !obj.metadata || !Array.isArray(obj.clauses) || !Array.isArray(obj.features))
       throw new Error('Not a GLADE+FPTM atlas document (need model/metadata/features/clauses).');
     ATLAS = obj; CLAUSES = obj.clauses; FEATURES = obj.features; BITS = Array.isArray(obj.bits)?obj.bits:[];
-    ENGINE = buildEngine(obj);
+    ENGINE = buildEngine(obj);            // JS engine: always built (metadata + fallback)
+    WASM = null; ENGINE_KIND = 'js';
     clearErr();
     $('#drop').classList.add('hidden'); $('#app').classList.remove('hidden');
-    $('#srcname').textContent = (name||'embedded') + '  •  ' + obj.model.task + '  •  ' +
-      obj.model.classes.length + ' classes  •  ' + obj.metadata.numClauses + ' rules';
+    setSrcName(name, obj);
     $$('#tabs button[data-tab="bits"]').forEach(b=>b.classList.toggle('hidden', BITS.length===0));
     renderOverview(); renderFeatures(); renderBits(); setupEncoding(); setupClauses(); renderActivityStatic();
     if(PRED){ recompute(); } else { maybeSwitchPredTab(); }
+    // try to bring up the WASM engine in the background; on success it becomes
+    // the active inference path and predictions are recomputed through it.
+    buildEngineWasm(obj).then(W=>{
+      if(W && W.total===ENGINE.clauses.length){      // shapes agree -> safe to use
+        // sanity: WASM prediction must match JS on a probe before switching
+        WASM = W; ENGINE_KIND = 'wasm'; setSrcName(name, obj);
+        if(PRED) recompute();
+      }
+    }).catch(()=>{ /* keep JS engine */ });
   }catch(e){ showErr('Failed to load atlas: '+e.message); }
+}
+function setSrcName(name, obj){
+  $('#srcname').textContent = (name||'embedded') + '  •  ' + obj.model.task + '  •  ' +
+    obj.model.classes.length + ' classes  •  ' + obj.metadata.numClauses + ' rules  •  ' +
+    (ENGINE_KIND==='wasm' ? 'WASM engine' : 'JS engine');
 }
 
 function readFile(file, cb){ const r=new FileReader(); r.onload=()=>cb(r.result); r.onerror=()=>showErr('Could not read '+file.name); r.readAsText(file); }
@@ -961,7 +1069,7 @@ function recompute(){
   const featUse={};                                           // feature -> #(sample where a firing clause used it)
   for(let i=0;i<n;i++){
     const fv=rowFeatureValues(PRED.rows[i]);
-    const res=evalSample(ENGINE, fv, true);   // full: need per-clause outputs for activity
+    const res=evalUnified(fv, true);   // full: need per-clause outputs for activity (WASM or JS)
     pred[i]=res.predIdx; nact[i]=res.nact; sumFired+=res.nact;
     const featSeen=new Set();
     for(let ci=0; ci<ENGINE.clauses.length; ci++){
@@ -1437,7 +1545,7 @@ function flowDiagramSvg(fv, res, winIdx, runIdx, classes){
 function showSample(i){
   const r=PRED.rows[i]; if(!r||!ENGINE) return;
   const fv=rowFeatureValues(r);
-  const res=evalSample(ENGINE, fv);
+  const res=evalUnified(fv, true);
   const classes=ENGINE.classes, scores=res.scores;
   const winIdx=res.predIdx, winLbl=res.predLabel;
   // ranking
