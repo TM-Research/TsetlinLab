@@ -41,6 +41,12 @@
   header h1{font-size:16px;margin:0;font-weight:600}
   header .sub{color:var(--mut);font-size:12px}
   .spacer{flex:1}
+  a.btn.home{text-decoration:none;color:var(--acc);border-color:var(--acc)}
+  a.btn.home:hover{background:var(--acc);color:var(--bg)}
+  .switchmenu{position:absolute;right:20px;top:54px;z-index:50;background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:8px;max-height:60vh;overflow:auto;box-shadow:0 10px 30px rgba(0,0,0,.5);min-width:280px}
+  .switchmenu .grp{color:var(--mut);font-size:11px;text-transform:uppercase;letter-spacing:.05em;padding:6px 8px 2px}
+  .switchmenu a{display:block;text-decoration:none;color:var(--fg);padding:6px 9px;border-radius:6px;font-size:13px}
+  .switchmenu a:hover{background:var(--panel2)} .switchmenu a.cur{color:var(--acc);font-weight:600}
   button,label.btn{background:var(--panel2);color:var(--fg);border:1px solid var(--line);border-radius:6px;padding:6px 12px;cursor:pointer;font-size:13px}
   button:hover,label.btn:hover{border-color:var(--acc)}
   button.linklike{background:none;border:none;color:var(--acc);padding:4px 2px;cursor:pointer}
@@ -268,12 +274,15 @@
 </head>
 <body>
 <header>
+  <a class="btn home" id="homeBtn" href="index.html" title="Back to all models">&larr; Home</a>
   <h1>GLADE + FPTM&nbsp;<span class="muted">Atlas</span></h1>
   <span class="sub" id="srcname">no model loaded</span>
   <span class="spacer"></span>
+  <button class="btn" id="switchBtn" title="Open a different model">Switch model ▾</button>
   <label class="btn">Load atlas JSON<input type="file" id="fileJson" accept=".json,application/json"></label>
   <label class="btn">Load samples CSV<input type="file" id="fileCsv" accept=".csv,text/csv"></label>
 </header>
+<div id="switchMenu" class="switchmenu hidden"></div>
 
 <main>
   <div id="errbox"></div>
@@ -1685,6 +1694,34 @@ $('#techToggle').addEventListener('change',e=>document.body.classList.toggle('te
 // honour the OS "reduce motion" setting; let the user toggle the flow animation
 try{ if(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches){ ANIMATE=false; $('#animToggle').checked=false; } }catch(e){}
 $('#animToggle').addEventListener('change',e=>{ ANIMATE=e.target.checked; if(predState.sel>=0 && PRED) showSample(predState.sel); });
+
+// ---------------------------------------------------------------- navigation
+// "Switch model" menu — jump to any of the bundled models without dead-ends.
+const MODELS = [
+  {grp:'GLADE + FPTM (this paper)', items:[
+    ['wustl','WUSTL-EHMS-2020'],['nslkdd','NSL-KDD'],['ton_iot','TON_IoT'],['medsec','MedSec-25']]},
+  {grp:'GLADE + TMU', items:[
+    ['gladetmu_wustl','WUSTL'],['gladetmu_nslkdd','NSL-KDD'],['gladetmu_ton_iot','TON_IoT'],['gladetmu_medsec','MedSec']]},
+  {grp:'TMU + TMU (baseline)', items:[
+    ['tmu_wustl','WUSTL'],['tmu_nslkdd','NSL-KDD'],['tmu_ton_iot','TON_IoT'],['tmu_medsec','MedSec']]},
+];
+(function(){
+  const cur = new URLSearchParams(location.search).get('src')||'';
+  const html = MODELS.map(g=>'<div class="grp">'+esc(g.grp)+'</div>'+
+    g.items.map(([k,lbl])=>{
+      const src='data/'+k+'_atlas.json', csv='data/'+k+'_predictions.csv';
+      const isCur = cur.indexOf(k+'_atlas')>=0;
+      return '<a class="'+(isCur?'cur':'')+'" href="viewer.html?src='+src+'&csv='+csv+'">'+esc(lbl)+(isCur?' ✓':'')+'</a>';
+    }).join('')
+  ).join('');
+  const menu=$('#switchMenu'); if(menu) menu.innerHTML=html;
+  const btn=$('#switchBtn');
+  if(btn&&menu){
+    btn.onclick=(e)=>{ e.stopPropagation(); menu.classList.toggle('hidden'); };
+    document.addEventListener('click',()=>menu.classList.add('hidden'));
+    menu.addEventListener('click',e=>e.stopPropagation());
+  }
+})();
 </script>
 </body>
 </html>
