@@ -1,7 +1,8 @@
 <!DOCTYPE html>
 <!--
-  GLADE + FPTM Atlas Viewer — a single-file, dependency-free browser UI for the
-  JSON produced by `python -m paper_2.atlas`.
+  TsetlinLab model viewer — a single-file, dependency-free browser UI for an
+  exported Tsetlin Machine model (the *_atlas.json + *_predictions.csv produced
+  by the exporter in code/exporter/). Inference runs client-side (WASM, JS fallback).
 
   What it does
   ------------
@@ -27,7 +28,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<title>GLADE + FPTM Atlas Viewer</title>
+<title>TsetlinLab — model viewer</title>
 <style>
   :root{
     --bg:#0f1117; --panel:#181b24; --panel2:#1f2431; --line:#2b3142;
@@ -275,7 +276,7 @@
 <body>
 <header>
   <a class="btn home" id="homeBtn" href="index.html" title="Back to all models">&larr; Home</a>
-  <h1>GLADE + FPTM&nbsp;<span class="muted">Atlas</span></h1>
+  <h1>Tsetlin<span class="muted">Lab</span></h1>
   <span class="sub" id="srcname">no model loaded</span>
   <span class="spacer"></span>
   <button class="btn" id="switchBtn" title="Open a different model">Switch model ▾</button>
@@ -643,7 +644,7 @@ function clearErr(){ $('#errbox').innerHTML=''; }
 function loadAtlas(obj, name){
   try{
     if(!obj || !obj.model || !obj.metadata || !Array.isArray(obj.clauses) || !Array.isArray(obj.features))
-      throw new Error('Not a GLADE+FPTM atlas document (need model/metadata/features/clauses).');
+      throw new Error('Not a valid model atlas (need model/metadata/features/clauses).');
     ATLAS = obj; CLAUSES = obj.clauses; FEATURES = obj.features; BITS = Array.isArray(obj.bits)?obj.bits:[];
     ENGINE = buildEngine(obj);            // JS engine: always built (metadata + fallback)
     WASM = null; ENGINE_KIND = 'js';
