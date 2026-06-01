@@ -1,0 +1,505 @@
+<!DOCTYPE html>
+<html lang="en"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Tsetlin Machine — Computation Flow Explorer</title>
+<style>
+:root{
+  --bg:#0b0e16;--p1:#12161f;--p2:#181d2a;--line:#283044;--fg:#e9edf6;--mut:#8c96ab;
+  --on:#46d39a;--off:#39425a;--acc:#6ea8ff;--neg:#ff6b8b;--pos:#46d39a;--warn:#ffce6b;
+  --inc:#6ea8ff;--exc:#39425a;--cA:#46d39a;--cB:#ff6b8b;--cC:#ffce6b;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{background:var(--bg);color:var(--fg);font:13px/1.45 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif}
+.top{display:flex;align-items:center;gap:16px;padding:12px 20px;background:linear-gradient(180deg,#12161f,#0c0f17);border-bottom:1px solid var(--line);position:sticky;top:0;z-index:40;flex-wrap:wrap}
+.top h1{font-size:15px;font-weight:700} .top h1 b{color:var(--acc)}
+.top .sub{color:var(--mut);font-size:11px}
+.spacer{flex:1}
+.samples{display:flex;gap:6px;flex-wrap:wrap}
+.samp{font-size:11px;border:1px solid var(--line);background:var(--p2);color:var(--mut);border-radius:999px;padding:4px 11px;cursor:pointer;display:flex;gap:6px;align-items:center;transition:.15s}
+.samp:hover{border-color:var(--acc)} .samp.on{color:var(--fg);border-color:var(--acc);background:#1a2740}
+.samp .pdot{width:9px;height:9px;border-radius:50%}
+
+/* timeline */
+.timeline{display:flex;align-items:center;gap:0;padding:14px 30px;background:var(--p1);border-bottom:1px solid var(--line);position:sticky;top:53px;z-index:35}
+.tstep{display:flex;flex-direction:column;align-items:center;gap:6px;cursor:pointer;position:relative;flex:1}
+.tstep .num{width:30px;height:30px;border-radius:50%;background:var(--p2);border:2px solid var(--line);display:flex;align-items:center;justify-content:center;font-weight:700;font-size:13px;color:var(--mut);transition:.25s;z-index:2}
+.tstep .lab{font-size:10.5px;color:var(--mut);text-transform:uppercase;letter-spacing:.05em;white-space:nowrap;transition:.25s}
+.tstep.active .num{background:var(--acc);border-color:var(--acc);color:#08111f;box-shadow:0 0 14px -1px var(--acc)}
+.tstep.active .lab{color:var(--fg)}
+.tstep.done .num{border-color:var(--acc);color:var(--acc)}
+.tline{position:absolute;top:15px;left:50%;width:100%;height:2px;background:var(--line);z-index:1}
+.tstep.done .tline,.tstep.active .tline{background:linear-gradient(90deg,var(--acc),var(--line))}
+.tstep:last-child .tline{display:none}
+
+.nav{display:flex;align-items:center;justify-content:center;gap:14px;padding:12px}
+.btn{background:var(--p2);border:1px solid var(--line);color:var(--fg);border-radius:8px;padding:8px 16px;cursor:pointer;font-size:13px;font-weight:600}
+.btn:hover{border-color:var(--acc)} .btn:disabled{opacity:.35;cursor:default}
+.btn.play{border-color:var(--acc);color:var(--acc)}
+
+/* stage area */
+.stage{position:relative;min-height:540px;padding:10px 26px 30px;overflow:hidden}
+.step{position:absolute;inset:10px 26px 30px;opacity:0;transform:translateX(40px);pointer-events:none;transition:opacity .45s ease,transform .45s ease}
+.step.active{opacity:1;transform:none;pointer-events:auto}
+.step.prev{transform:translateX(-40px)}
+.step h2{font-size:12px;text-transform:uppercase;letter-spacing:.08em;color:var(--mut);margin-bottom:4px}
+.step .cap{color:var(--mut);font-size:11.5px;margin-bottom:14px}
+
+/* columns layout with connector overlay */
+.cols{position:relative;display:grid;gap:48px;align-items:start}
+.connsvg{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;z-index:1;overflow:visible}
+.col{position:relative;z-index:2;display:flex;flex-direction:column;gap:10px}
+.colhead{font-size:10px;text-transform:uppercase;letter-spacing:.07em;color:var(--mut);text-align:center;margin-bottom:2px}
+
+/* generic node card */
+.node{background:var(--p2);border:1px solid var(--line);border-radius:9px;padding:8px 11px;position:relative;opacity:0;animation:pop .4s ease forwards}
+@keyframes pop{from{opacity:0;transform:translateY(8px) scale(.96)}to{opacity:1;transform:none}}
+.node .nm{font-weight:600;font-size:12px}
+.node .vl{font-variant-numeric:tabular-nums}
+
+/* overview pipeline */
+.pipe{display:flex;align-items:stretch;gap:0;justify-content:center;margin-top:24px}
+.pstage{flex:1;max-width:230px;background:var(--p2);border:1px solid var(--line);border-radius:14px;padding:16px;text-align:center;cursor:pointer;transition:.2s;position:relative}
+.pstage:hover{border-color:var(--acc);transform:translateY(-3px)}
+.pstage .pico{font-size:30px;margin-bottom:8px}
+.pstage .ph{font-weight:700;font-size:14px;margin-bottom:8px}
+.pstage .pv{font-size:11.5px;color:var(--mut);min-height:54px;display:flex;align-items:center;justify-content:center;flex-wrap:wrap;gap:4px}
+.parrow{display:flex;align-items:center;color:var(--acc);font-size:26px;padding:0 4px;animation:slidearr 1.4s ease-in-out infinite}
+@keyframes slidearr{50%{transform:translateX(5px)}}
+.minichip{display:inline-block;background:var(--p1);border:1px solid var(--line);border-radius:5px;padding:1px 6px;font-size:10.5px}
+.ov-result{text-align:center;margin-top:26px}
+.ov-result .big{font-size:26px;font-weight:800}
+
+/* feature / bit / literal cells */
+.feat{display:flex;align-items:center;gap:10px}
+.gauge{flex:1;height:26px;background:var(--p1);border:1px solid var(--line);border-radius:6px;position:relative;overflow:hidden}
+.gfill{position:absolute;left:0;top:0;bottom:0;background:linear-gradient(90deg,#26405f,var(--acc));border-radius:5px;transition:width .6s}
+.gthr{position:absolute;top:-3px;bottom:-3px;width:2px;background:var(--warn)}
+.gthr .tlab{position:absolute;top:-15px;left:50%;transform:translateX(-50%);font-size:9px;color:var(--warn);white-space:nowrap}
+.gval{position:absolute;top:50%;transform:translateY(-50%);font-size:10px;font-weight:700;color:#fff;text-shadow:0 1px 2px #000}
+.bitrow{display:flex;gap:6px;flex-wrap:wrap}
+.bit{font-size:10px;border-radius:5px;padding:3px 7px;border:1px solid var(--line);font-variant-numeric:tabular-nums}
+.bit.t{background:#11331f;border-color:#2a5a3c;color:var(--on)} .bit.f{background:#1a1014;border-color:#4a2630;color:var(--neg)}
+.lit{font-size:11px;border-radius:6px;padding:4px 8px;border:1px solid var(--line);display:flex;justify-content:space-between;gap:8px;font-variant-numeric:tabular-nums}
+.lit.t{background:#11331f;border-color:#2a5a3c} .lit.f{background:#161b27;color:var(--mut)}
+.lit .lname{font-family:ui-monospace,Menlo,monospace}
+.lit .lval{font-weight:700} .lit.t .lval{color:var(--on)} .lit.f .lval{color:var(--mut)}
+
+/* literal array grid (step 2) */
+.litgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px;margin-top:6px}
+
+/* clause cards (step 3) */
+.clausecol{display:flex;flex-direction:column;gap:9px}
+.clause{background:var(--p2);border:1px solid var(--line);border-left-width:4px;border-radius:9px;padding:9px 11px;cursor:pointer;transition:.18s;position:relative;opacity:0;animation:pop .4s ease forwards}
+.clause:hover{border-color:var(--acc);transform:translateX(2px)}
+.clause.fired{box-shadow:0 0 0 1px currentColor}
+.clause .chead{display:flex;align-items:center;gap:8px;font-size:12px;font-weight:600;margin-bottom:5px}
+.clause .fire{margin-left:auto;font-size:11px;font-weight:800;border-radius:5px;padding:1px 8px}
+.clause .fire.y{background:#11331f;color:var(--on)} .clause .fire.n{background:#1a1014;color:var(--neg)}
+.lchips{display:flex;gap:5px;flex-wrap:wrap}
+.lchip{font-size:10px;border-radius:5px;padding:2px 7px;border:1px solid var(--line);font-family:ui-monospace,monospace}
+.lchip.inc.sat{background:#11331f;border-color:#2a5a3c;color:var(--on)}
+.lchip.inc.unsat{background:#2a1016;border-color:#5a2630;color:var(--neg)}
+.exhint{font-size:10px;color:var(--mut);margin-top:5px}
+
+/* class voting (step 4) */
+.votebars{display:flex;flex-direction:column;gap:16px;margin-top:10px;max-width:560px}
+.vrow{display:grid;grid-template-columns:120px 1fr 60px;gap:12px;align-items:center}
+.vrow .vn{font-weight:700;text-align:right}
+.vtrack{height:30px;background:var(--p1);border:1px solid var(--line);border-radius:7px;position:relative;overflow:hidden}
+.vzero{position:absolute;top:0;bottom:0;width:1px;background:var(--mut);left:50%}
+.vfill{position:absolute;top:3px;bottom:3px;border-radius:5px;transition:width .8s cubic-bezier(.2,.8,.2,1),left .8s}
+.vrow.win .vn{color:var(--on)}
+.vscore{font-weight:800;font-variant-numeric:tabular-nums}
+.winner{margin-top:26px;text-align:center;font-size:15px}
+.winner .wb{font-size:30px;font-weight:800}
+
+/* connectors */
+.conn{fill:none;stroke-width:2;stroke-dasharray:var(--len);stroke-dashoffset:var(--len);animation:draw .7s ease forwards}
+@keyframes draw{to{stroke-dashoffset:0}}
+
+/* clause rule modal */
+.modal{position:fixed;inset:0;background:#06080cd0;display:none;align-items:center;justify-content:center;z-index:80}
+.modal.show{display:flex}
+.mcard{background:var(--p1);border:1px solid var(--acc);border-radius:14px;padding:22px 24px;max-width:560px;width:90%;box-shadow:0 20px 60px #000}
+.mcard h3{font-size:14px;margin-bottom:4px} .mcard .mc-sub{color:var(--mut);font-size:11px;margin-bottom:16px}
+.rule{font-size:15px;line-height:1.9;font-family:ui-monospace,Menlo,monospace;background:var(--p2);border:1px solid var(--line);border-radius:10px;padding:14px 16px}
+.rule .kw{color:var(--warn);font-weight:700} .rule .feat{color:var(--acc)} .rule .cls{color:var(--on);font-weight:700}
+.rule .and{color:var(--mut)}
+.mc-close{margin-top:16px;text-align:right}
+.condlist{margin-top:14px;display:flex;flex-direction:column;gap:6px}
+.condrow{display:flex;align-items:center;gap:9px;font-size:12px}
+.condrow .mk{width:18px;text-align:center;font-weight:800}
+.condrow.sat .mk{color:var(--on)} .condrow.unsat .mk{color:var(--neg)}
+.legend{display:flex;gap:14px;font-size:10.5px;color:var(--mut);justify-content:center;padding:0 0 6px}
+.legend i{width:11px;height:11px;border-radius:3px;display:inline-block;vertical-align:middle;margin-right:4px}
+.kbd{font-size:10px;color:var(--mut)}
+</style></head>
+<body>
+
+<div class="top">
+  <h1>Tsetlin<b>Machine</b> · Computation Flow Explorer</h1>
+  <span class="sub" id="sub"></span>
+  <span class="spacer"></span>
+  <div class="samples" id="samples"></div>
+</div>
+
+<div class="timeline" id="timeline"></div>
+
+<div class="nav">
+  <button class="btn" id="prev">‹ Back</button>
+  <button class="btn play" id="play">▶ Auto-play</button>
+  <button class="btn" id="next">Next ›</button>
+  <span class="kbd">← / → to scrub · click any clause for its rule</span>
+</div>
+
+<div class="legend" id="legend"></div>
+
+<div class="stage" id="stage">
+  <!-- step 0: overview -->
+  <div class="step" data-step="0" id="s0">
+    <h2>Top-level pipeline</h2>
+    <div class="cap">The whole computation, one glance. Click any stage to drill in →</div>
+    <div class="pipe" id="pipe"></div>
+    <div class="ov-result" id="ovResult"></div>
+  </div>
+  <!-- step 1: input -> booleanizer -->
+  <div class="step" data-step="1" id="s1">
+    <h2>① Input → Booleanizer</h2>
+    <div class="cap">Each raw reading is compared to its thresholds → bits → a positive literal and its negation.</div>
+    <div class="cols" id="s1cols" style="grid-template-columns:1.2fr .9fr 1fr"><svg class="connsvg" id="s1conn"></svg></div>
+  </div>
+  <!-- step 2: literal array -->
+  <div class="step" data-step="2" id="s2">
+    <h2>② The literal array fed to the machine</h2>
+    <div class="cap">Every literal the clauses can use. Green = currently TRUE for this sample.</div>
+    <div class="litgrid" id="litgrid"></div>
+  </div>
+  <!-- step 3: literals -> clauses -->
+  <div class="step" data-step="3" id="s3">
+    <h2>③ Literals → Clauses</h2>
+    <div class="cap">A clause INCLUDES some literals (its automata are in Include state). It fires (=1) only if every included literal is TRUE. Click a clause for its rule.</div>
+    <div class="cols" id="s3cols" style="grid-template-columns:.7fr 1.3fr"><svg class="connsvg" id="s3conn"></svg></div>
+  </div>
+  <!-- step 4: clauses -> class -->
+  <div class="step" data-step="4" id="s4">
+    <h2>④ Clauses → Class decision</h2>
+    <div class="cap">Each fired clause casts its vote (＋ for, − against) into its class. Highest total wins.</div>
+    <div class="cols" id="s4cols" style="grid-template-columns:.8fr 1.2fr"><svg class="connsvg" id="s4conn"></svg></div>
+    <div class="winner" id="winner"></div>
+  </div>
+</div>
+
+<div class="modal" id="modal"><div class="mcard" id="mcard"></div></div>
+
+<script>
+"use strict";
+const $=s=>document.querySelector(s), $$=s=>[...document.querySelectorAll(s)];
+const NS="http://www.w3.org/2000/svg";
+const CCLR=['var(--cA)','var(--cB)','var(--cC)'];
+
+/* ============================ SIMULATED MODEL ============================ */
+const MODEL = {
+  features:[
+    {name:'Temp',    unit:'°C', min:0, max:100, thresholds:[30,70]},
+    {name:'Load',    unit:'%',  min:0, max:100, thresholds:[40,80]},
+    {name:'Latency', unit:'ms', min:0, max:500, thresholds:[100,300]},
+    {name:'Errors',  unit:'/s', min:0, max:50,  thresholds:[5,20]},
+  ],
+  classes:['Normal','Attack'],
+};
+// derive bits + literals: bit b = (feature value >= threshold). literal Lb (positive)=bit b true; ¬Lb = bit b false.
+(function(){
+  const bits=[]; MODEL.features.forEach((f,fi)=>f.thresholds.forEach((t,ti)=>bits.push({feat:fi,thr:t,name:f.name})));
+  MODEL.bits=bits;                       // index = bit id
+  // literal id: 0..B-1 = positive bit i ; B..2B-1 = negated bit (i-B)
+  MODEL.nbits=bits.length;
+})();
+const B=MODEL.nbits;
+// clauses: include = array of literal ids; cls = class index; polarity +1/-1
+MODEL.clauses=[
+  {id:0, cls:0, pol:+1, inc:[lpos(0), lneg(2)]},                 // Temp≥30 AND Load<80  -> Normal
+  {id:1, cls:0, pol:+1, inc:[lneg(4), lneg(6)]},                 // Latency<100 AND Errors<5 -> Normal
+  {id:2, cls:0, pol:-1, inc:[lpos(7)]},                          // Errors≥20 -> against Normal
+  {id:3, cls:1, pol:+1, inc:[lpos(6), lpos(4)]},                 // Errors≥5 AND Latency≥100 -> Attack
+  {id:4, cls:1, pol:+1, inc:[lpos(1), lpos(5)]},                 // Temp≥70 AND Load≥80 -> Attack
+  {id:5, cls:1, pol:-1, inc:[lneg(6), lneg(4)]},                 // Errors<5 AND Latency<100 -> against Attack
+];
+function lpos(b){return b;} function lneg(b){return B+b;}
+function litFeat(l){ return MODEL.bits[l<B?l:l-B].feat; }
+function litThr(l){ return MODEL.bits[l<B?l:l-B].thr; }
+function litNeg(l){ return l>=B; }
+function litName(l){ return (l>=B?'¬':'')+'L'+(l%B); }
+function litReadable(l){ const f=MODEL.features[litFeat(l)], t=litThr(l);
+  return f.name+(litNeg(l)?' < ':' ≥ ')+t+(f.unit?f.unit:''); }
+
+const SAMPLES=[
+  {name:'Calm',     v:[24, 30, 60, 1]},
+  {name:'Busy-OK',  v:[55, 65, 90, 3]},
+  {name:'Attack!',  v:[82, 88, 350, 28]},
+  {name:'Sneaky',   v:[40, 35, 220, 9]},
+  {name:'Overheat', v:[78, 50, 80, 2]},
+];
+
+/* ============================ COMPUTE ============================ */
+function run(sample){
+  const bitVal = MODEL.bits.map(b=> sample.v[b.feat] >= b.thr ? 1:0);
+  const litVal = id => id<B ? bitVal[id] : (1-bitVal[id-B]);
+  const clauses = MODEL.clauses.map(c=>{
+    const lits=c.inc.map(l=>({l, val:litVal(l), sat:litVal(l)===1}));
+    const fire = lits.every(x=>x.sat) && lits.length>0 ? 1:0;
+    return {...c, lits, fire};
+  });
+  const scores = MODEL.classes.map((_,k)=> clauses.filter(c=>c.cls===k && c.fire)
+     .reduce((s,c)=>s + c.pol, 0));
+  let pred=0; for(let k=1;k<scores.length;k++) if(scores[k]>scores[pred]) pred=k;
+  return {bitVal, litVal, clauses, scores, pred};
+}
+
+/* ============================ STATE ============================ */
+let SI=0;            // sample index
+let STEP=0;          // 0..4
+let R=run(SAMPLES[0]);
+let autoTimer=null;
+
+/* ============================ STATIC UI ============================ */
+$('#sub').textContent=`${MODEL.features.length} features → ${2*B} literals → ${MODEL.clauses.length} clauses → ${MODEL.classes.length} classes`;
+$('#legend').innerHTML=
+  `<span><i style="background:var(--on)"></i>literal TRUE / clause fired</span>`+
+  `<span><i style="background:var(--neg)"></i>FALSE / votes against</span>`+
+  `<span><i style="background:var(--inc)"></i>included literal (automaton = Include)</span>`+
+  MODEL.classes.map((c,i)=>`<span><i style="background:${CCLR[i]}"></i>${c}</span>`).join('');
+
+function renderSamples(){
+  $('#samples').innerHTML=SAMPLES.map((s,i)=>{
+    const r=run(s);
+    return `<span class="samp ${i===SI?'on':''}" data-i="${i}">
+      <span class="pdot" style="background:${CCLR[r.pred]}"></span>${s.name}</span>`;
+  }).join('');
+  $$('#samples .samp').forEach(el=>el.onclick=()=>selectSample(+el.dataset.i));
+}
+const STEPS=['Overview','Booleanize','Literals','Clauses','Class'];
+function renderTimeline(){
+  $('#timeline').innerHTML=STEPS.map((s,i)=>
+    `<div class="tstep ${i===STEP?'active':''} ${i<STEP?'done':''}" data-s="${i}">
+      <div class="tline"></div><div class="num">${i}</div><div class="lab">${s}</div></div>`).join('');
+  $$('#timeline .tstep').forEach(el=>el.onclick=()=>goStep(+el.dataset.s));
+}
+
+/* ============================ NAV ============================ */
+function goStep(s){
+  s=Math.max(0,Math.min(4,s));
+  const dir=s>=STEP;
+  STEP=s; renderTimeline();
+  $$('.step').forEach(el=>{ const k=+el.dataset.step;
+    el.classList.toggle('active',k===s); el.classList.toggle('prev',k<s); });
+  $('#prev').disabled=(s===0); $('#next').disabled=(s===4);
+  renderStep(s);
+}
+$('#prev').onclick=()=>goStep(STEP-1);
+$('#next').onclick=()=>goStep(STEP+1);
+document.addEventListener('keydown',e=>{ if(e.key==='ArrowRight')goStep(STEP+1); if(e.key==='ArrowLeft')goStep(STEP-1); });
+$('#play').onclick=()=>{
+  if(autoTimer){ clearInterval(autoTimer); autoTimer=null; $('#play').textContent='▶ Auto-play'; return; }
+  $('#play').textContent='⏸ Pause';
+  goStep(0);
+  autoTimer=setInterval(()=>{ if(STEP>=4){ clearInterval(autoTimer); autoTimer=null; $('#play').textContent='▶ Auto-play'; } else goStep(STEP+1); },1500);
+};
+function selectSample(i){ SI=i; R=run(SAMPLES[i]); renderSamples(); renderStep(STEP); }
+
+/* ============================ RENDER PER STEP ============================ */
+function renderStep(s){
+  if(s===0) renderOverview();
+  if(s===1) renderBooleanize();
+  if(s===2) renderLiterals();
+  if(s===3) renderClauses();
+  if(s===4) renderVotes();
+}
+
+/* ---- step 0 overview ---- */
+function renderOverview(){
+  const nFired=R.clauses.filter(c=>c.fire).length;
+  const litTrue=Array.from({length:2*B},(_,l)=>R.litVal(l)).filter(v=>v).length;
+  const stages=[
+    {ico:'📥',h:'Raw Input',v:MODEL.features.map((f,i)=>`<span class="minichip">${f.name} ${SAMPLES[SI].v[i]}</span>`).join('')},
+    {ico:'🌡️',h:'Booleanizer',v:`<span class="minichip">${2*B} literals</span><span class="minichip" style="color:var(--on)">${litTrue} TRUE</span>`},
+    {ico:'🧩',h:'Clauses Fired',v:`<span class="minichip" style="color:var(--on)">${nFired} of ${MODEL.clauses.length}</span>`},
+    {ico:'🎯',h:'Class Output',v:`<span class="minichip" style="color:${CCLR[R.pred]};border-color:${CCLR[R.pred]}">${MODEL.classes[R.pred]}</span>`},
+  ];
+  $('#pipe').innerHTML=stages.map((st,i)=>
+    `<div class="pstage" data-go="${i+1}"><div class="pico">${st.ico}</div><div class="ph">${st.h}</div><div class="pv">${st.v}</div></div>`+
+    (i<3?'<div class="parrow">➜</div>':'')).join('');
+  $$('#pipe .pstage').forEach(el=>el.onclick=()=>goStep(+el.dataset.go));
+  $('#ovResult').innerHTML=`<div class="cap">prediction</div><div class="big" style="color:${CCLR[R.pred]}">${MODEL.classes[R.pred]}</div>
+    <div class="cap" style="margin-top:6px">scores · ${MODEL.classes.map((c,k)=>`${c} ${R.scores[k]>0?'+':''}${R.scores[k]}`).join('  ·  ')}</div>`;
+}
+
+/* ---- step 1 booleanize ---- */
+function renderBooleanize(){
+  const cols=$('#s1cols');
+  cols.innerHTML='<svg class="connsvg" id="s1conn"></svg>'+
+    '<div class="col" id="s1f"><div class="colhead">raw features</div></div>'+
+    '<div class="col" id="s1b"><div class="colhead">threshold tests → bits</div></div>'+
+    '<div class="col" id="s1l"><div class="colhead">literals (＋ and ¬)</div></div>';
+  const fC=$('#s1f'), bC=$('#s1b'), lC=$('#s1l');
+  const featEl=[], bitEl={}, litEl={};
+  MODEL.features.forEach((f,fi)=>{
+    const v=SAMPLES[SI].v[fi], pct=(v-f.min)/(f.max-f.min)*100;
+    const thrM=f.thresholds.map(t=>`<div class="gthr" style="left:${(t-f.min)/(f.max-f.min)*100}%"><span class="tlab">${t}</span></div>`).join('');
+    const d=document.createElement('div'); d.className='node'; d.style.animationDelay=(fi*80)+'ms';
+    d.innerHTML=`<div class="nm">${f.name} <span class="vl" style="color:var(--acc)">${v}${f.unit}</span></div>
+      <div class="feat" style="margin-top:6px"><div class="gauge"><div class="gfill" style="width:${pct}%"></div>${thrM}<span class="gval" style="left:calc(${Math.min(92,pct)}% )">${v}</span></div></div>`;
+    fC.appendChild(d); featEl[fi]=d;
+  });
+  MODEL.bits.forEach((b,bi)=>{
+    const on=R.bitVal[bi];
+    const d=document.createElement('div'); d.className='node'; d.style.animationDelay=(120+bi*70)+'ms';
+    d.innerHTML=`<div class="nm" style="font-size:11px">${b.name} ≥ ${b.thr} ?</div>
+      <div class="bitrow" style="margin-top:5px"><span class="bit ${on?'t':'f'}">bit ${bi} = ${on}</span></div>`;
+    bC.appendChild(d); bitEl[bi]=d;
+  });
+  for(let l=0;l<2*B;l++){
+    const on=R.litVal(l), bi=l%B;
+    const d=document.createElement('div'); d.className='node'; d.style.padding='0'; d.style.background='none'; d.style.border='none';
+    d.style.animationDelay=(220+l*30)+'ms';
+    d.innerHTML=`<div class="lit ${on?'t':'f'}"><span class="lname">${litName(l)}</span><span style="color:var(--mut);font-size:10px">${litReadable(l)}</span><span class="lval">${on}</span></div>`;
+    lC.appendChild(d); litEl[l]=d.firstElementChild;
+  }
+  requestAnimationFrame(()=>{
+    const pairs=[];
+    MODEL.bits.forEach((b,bi)=>{ pairs.push({from:featEl[b.feat],to:bitEl[bi],c:'#33415e'}); });
+    for(let l=0;l<2*B;l++){ pairs.push({from:bitEl[l%B],to:litEl[l],c:R.litVal(l)?'var(--on)':'#39425a'}); }
+    drawConn('s1cols','s1conn',pairs);
+  });
+}
+
+/* ---- step 2 literal array ---- */
+function renderLiterals(){
+  const g=$('#litgrid');
+  g.innerHTML=Array.from({length:2*B},(_,l)=>{
+    const on=R.litVal(l);
+    return `<div class="lit ${on?'t':'f'}" style="animation:pop .4s ${l*30}ms both">
+      <span class="lname">${litName(l)}</span>
+      <span style="color:var(--mut);font-size:10px;flex:1;text-align:center">${litReadable(l)}</span>
+      <span class="lval">${on}</span></div>`;
+  }).join('');
+}
+
+/* ---- step 3 literals -> clauses ---- */
+function renderClauses(){
+  const cols=$('#s3cols');
+  cols.innerHTML='<svg class="connsvg" id="s3conn"></svg>'+
+    '<div class="col" id="s3l"><div class="colhead">literals (TRUE lit) </div></div>'+
+    '<div class="clausecol col" id="s3c"><div class="colhead">clauses</div></div>';
+  const lC=$('#s3l'), cC=$('#s3c');
+  // show only literals used by some clause, compactly
+  const used=[...new Set(MODEL.clauses.flatMap(c=>c.inc))].sort((a,b)=>a-b);
+  const litEl={};
+  used.forEach((l,i)=>{ const on=R.litVal(l);
+    const d=document.createElement('div'); d.className='node'; d.style.padding='4px 8px'; d.style.animationDelay=(i*40)+'ms';
+    d.innerHTML=`<div class="lit ${on?'t':'f'}" style="border:none;background:none;padding:0"><span class="lname">${litName(l)}</span><span style="font-size:9px;color:var(--mut)">${litReadable(l)}</span><span class="lval">${on}</span></div>`;
+    lC.appendChild(d); litEl[l]=d;
+  });
+  const clEl={};
+  R.clauses.forEach((c,ci)=>{
+    const col=CCLR[c.cls];
+    const d=document.createElement('div'); d.className='clause'+(c.fire?' fired':''); d.style.borderLeftColor=col; d.style.color=col;
+    d.style.animationDelay=(ci*90)+'ms'; d.dataset.cid=c.id;
+    const chips=c.lits.map(x=>`<span class="lchip inc ${x.sat?'sat':'unsat'}">${litName(x.l)}=${x.val}</span>`).join('');
+    d.innerHTML=`<div class="chead"><span style="color:${col}">Clause ${c.id}</span>
+        <span style="color:var(--mut);font-weight:400;font-size:10px">${c.pol>0?'＋ for':'− against'} ${MODEL.classes[c.cls]}</span>
+        <span class="fire ${c.fire?'y':'n'}">${c.fire?'FIRES ✓ 1':'0'}</span></div>
+      <div class="lchips">${chips}</div>
+      <div class="exhint">includes ${c.inc.length} literal(s) · fires only if all are TRUE · click for rule</div>`;
+    d.onclick=()=>showRule(c.id);
+    cC.appendChild(d); clEl[c.id]=d;
+  });
+  requestAnimationFrame(()=>{
+    const pairs=[];
+    R.clauses.forEach(c=> c.lits.forEach(x=>{ if(litEl[x.l]) pairs.push({from:litEl[x.l],to:clEl[c.id],c:x.sat?'var(--on)':'var(--neg)',w:x.sat?2:1.2}); }));
+    drawConn('s3cols','s3conn',pairs);
+  });
+}
+
+/* ---- step 4 clauses -> class ---- */
+function renderVotes(){
+  const cols=$('#s4cols');
+  cols.innerHTML='<svg class="connsvg" id="s4conn"></svg>'+
+    '<div class="col" id="s4c"><div class="colhead">fired clauses (votes)</div></div>'+
+    '<div class="col" id="s4k"><div class="colhead">class totals</div></div>';
+  const cC=$('#s4c'), kC=$('#s4k');
+  const fired=R.clauses.filter(c=>c.fire);
+  const clEl={};
+  (fired.length?fired:[{id:'—',cls:R.pred,pol:0}]).forEach((c,i)=>{
+    const col=CCLR[c.cls]; const d=document.createElement('div'); d.className='node'; d.style.borderLeft='4px solid '+col; d.style.animationDelay=(i*90)+'ms';
+    d.innerHTML= c.id==='—'?'<div class="nm" style="color:var(--mut)">no clause fired</div>'
+      :`<div class="nm">Clause ${c.id} <span style="float:right;font-weight:800;color:${c.pol>0?'var(--on)':'var(--neg)'}">${c.pol>0?'+1':'−1'}</span></div>
+        <div style="font-size:10px;color:var(--mut)">${c.pol>0?'votes for':'votes against'} ${MODEL.classes[c.cls]}</div>`;
+    cC.appendChild(d); if(c.id!=='—') clEl[c.id]=d;
+  });
+  const kEl={}; const mx=Math.max(1,...R.scores.map(s=>Math.abs(s)));
+  MODEL.classes.forEach((cl,k)=>{
+    const sc=R.scores[k], col=CCLR[k], w=Math.abs(sc)/mx*48, pos=sc>=0;
+    const d=document.createElement('div'); d.className='node'+(k===R.pred?' ':''); d.style.animationDelay=(120+k*120)+'ms'; d.style.borderColor=k===R.pred?col:'var(--line)';
+    if(k===R.pred) d.style.boxShadow='0 0 16px -2px '+col;
+    d.innerHTML=`<div class="nm" style="color:${col}">${k===R.pred?'👑 ':''}${cl} <span style="float:right;font-weight:800">${sc>0?'+':''}${sc}</span></div>
+      <div class="vtrack" style="margin-top:7px"><div class="vzero"></div>
+        <div class="vfill" style="background:${pos?col:'var(--neg)'};${pos?'left:50%;width:'+w+'%':'right:50%;width:'+w+'%'}"></div></div>`;
+    kC.appendChild(d); kEl[k]=d;
+  });
+  requestAnimationFrame(()=>{
+    const pairs=[];
+    fired.forEach(c=>{ if(clEl[c.id]&&kEl[c.cls]) pairs.push({from:clEl[c.id],to:kEl[c.cls],c:c.pol>0?'var(--on)':'var(--neg)',w:2}); });
+    drawConn('s4cols','s4conn',pairs);
+  });
+  $('#winner').innerHTML=`decision → <span class="wb" style="color:${CCLR[R.pred]}">${MODEL.classes[R.pred]}</span>`;
+}
+
+/* ============================ CONNECTORS ============================ */
+function drawConn(containerId, svgId, pairs){
+  const cont=$('#'+containerId), svg=$('#'+svgId);
+  if(!cont||!svg) return;
+  const cb=cont.getBoundingClientRect();
+  svg.setAttribute('viewBox',`0 0 ${cb.width} ${cb.height}`);
+  svg.innerHTML='';
+  pairs.forEach((p,i)=>{
+    if(!p.from||!p.to) return;
+    const a=p.from.getBoundingClientRect(), b=p.to.getBoundingClientRect();
+    const x1=a.right-cb.left, y1=a.top-cb.top+a.height/2;
+    const x2=b.left-cb.left,  y2=b.top-cb.top+b.height/2;
+    const mx=(x1+x2)/2;
+    const d=`M${x1} ${y1}C${mx} ${y1} ${mx} ${y2} ${x2} ${y2}`;
+    const len=Math.hypot(x2-x1,y2-y1)+Math.abs(y2-y1)*0.5+40;
+    const path=document.createElementNS(NS,'path');
+    path.setAttribute('d',d); path.setAttribute('class','conn');
+    path.setAttribute('stroke',p.c||'#33415e'); path.setAttribute('stroke-width',p.w||1.6);
+    path.style.setProperty('--len',len); path.style.animationDelay=(i*45)+'ms';
+    svg.appendChild(path);
+  });
+}
+window.addEventListener('resize',()=>{ if(STEP===1)renderBooleanize(); if(STEP===3)renderClauses(); if(STEP===4)renderVotes(); });
+
+/* ============================ CLAUSE RULE MODAL ============================ */
+function showRule(cid){
+  const c=R.clauses.find(x=>x.id===cid); if(!c) return;
+  const col=CCLR[c.cls];
+  const conds=c.lits.map(x=>`<span class="feat">${MODEL.features[litFeat(x.l)].name}</span> ${litNeg(x.l)?'<':'≥'} ${litThr(x.l)}`);
+  const ruleHtml=`<span class="kw">IF</span> `+conds.join(' <span class="and">AND</span> ')+
+     ` <span class="kw">THEN</span> ${c.pol>0?'vote <span class="cls">FOR</span>':'vote <span class="cls" style="color:var(--neg)">AGAINST</span>'} <span class="cls" style="color:${col}">${MODEL.classes[c.cls]}</span>`;
+  const condRows=c.lits.map(x=>`<div class="condrow ${x.sat?'sat':'unsat'}">
+     <span class="mk">${x.sat?'✓':'✗'}</span>
+     <span><b>${litReadable(x.l)}</b></span>
+     <span style="color:var(--mut);margin-left:auto">your value: ${SAMPLES[SI].v[litFeat(x.l)]}${MODEL.features[litFeat(x.l)].unit} → ${x.sat?'holds':'fails'}</span></div>`).join('');
+  $('#mcard').innerHTML=`<h3 style="color:${col}">Clause ${c.id} — ${c.pol>0?'supports':'opposes'} ${MODEL.classes[c.cls]}</h3>
+    <div class="mc-sub">automata in Include state: ${c.inc.map(litName).join(', ')} · all others Excluded</div>
+    <div class="rule">${ruleHtml}</div>
+    <div class="condlist">${condRows}</div>
+    <div class="mc-sub" style="margin-top:14px">This clause ${c.fire?'<b style="color:var(--on)">FIRES (=1)</b> — every included literal holds':'<b style="color:var(--neg)">does not fire (=0)</b> — at least one included literal fails'} for sample “${SAMPLES[SI].name}”.</div>
+    <div class="mc-close"><button class="btn" onclick="document.getElementById('modal').classList.remove('show')">Close ✕</button></div>`;
+  $('#modal').classList.add('show');
+}
+$('#modal').onclick=e=>{ if(e.target.id==='modal') $('#modal').classList.remove('show'); };
+
+/* ============================ INIT ============================ */
+renderSamples(); renderTimeline(); goStep(0);
+</script>
+</body></html>
