@@ -459,9 +459,11 @@
   </div>
 </main>
 
-<!-- WebAssembly inference kernel (optional; viewer falls back to the JS engine
-     if this file is absent). Single-file module, loads on demand. -->
+<!-- WebAssembly inference kernels (optional; viewer falls back to the JS engine
+     if absent). fptm.js = graded Fuzzy-Pattern model; tmu.js = weighted-crisp
+     vanilla TM. The active kernel is chosen per loaded model. -->
 <script src="code/wasm/fptm.js"></script>
+<script src="code/wasm/tmu.js"></script>
 <script>
 "use strict";
 const $ = s => document.querySelector(s);
@@ -619,9 +621,63 @@ function evalSampleWasm(W, fv, full){
   return {predIdx, predLabel:W.classes[predIdx], scores, activated, clauseOut, nact};
 }
 
-// Unified evaluate: routes to WASM when active, else JS. Same return shape.
+// --- TMU weighted-crisp WASM engine (atlas.tmu present) --------------------
+// Per-class signed weights; clause fires iff all included literals hold (empty
+// clause -> 0); class score = Σ weight·fire; argmax. Verified bit-exact (2000/2000).
+async function buildEngineWasmTMU(atlas){
+  if (typeof TMU === 'undefined' || !atlas.tmu) return null;
+  const T=atlas.tmu, classes=atlas.model.classes.map(String);
+  const ncls=T.ncls, nbits=T.nbits, C=T.clausesPerClass;
+  if(!ncls||!nbits||!C) return null;
+  let mod; try{ mod=await TMU(); }catch(e){ return null; }
+  try{
+    if(mod.ccall('tmu_create','number',['number','number','number'],[ncls,nbits,C])!==0) return null;
+    const total=mod.ccall('tmu_num_clauses','number',[],[]);
+    const per={}; // clsIdx -> running clause index
+    // global id -> atlas clause (for introspection in the explain panel)
+    const byId={};
+    T.clauses.forEach(c=>{
+      const k=c.clsIdx; per[k]=(per[k]||0); const id=k*C+per[k]; per[k]++;
+      if(id>=total) return;
+      byId[id]=c;
+      mod.ccall('tmu_set_weight','void',['number','number'],[id, c.weight|0]);
+      (c.lits||[]).forEach(l=>mod.ccall('tmu_add_literal','void',['number','number','number'],[id,l.bit,l.neg?1:0]));
+    });
+    const clsIdx={}; classes.forEach((c,i)=>clsIdx[c]=i);
+    const xptr=mod._malloc(nbits), sptr=mod._malloc(Math.max(ncls,total)*4);
+    return {kind:'tmu', mod, classes, clsIdx, bits:T.bits, nbits, ncls, total, C, xptr, sptr, byId};
+  }catch(e){ return null; }
+}
+function evalSampleWasmTMU(W, fv, full){
+  full=full!==false; const m=W.mod;
+  const xb=new Uint8Array(W.nbits);
+  for(let b=0;b<W.nbits;b++){ const s=W.bits[b]; xb[b]=(fv[s.feature]>=s.threshold)?1:0; }
+  m.HEAPU8.set(xb, W.xptr);
+  m.ccall('tmu_class_sums','void',['number','number'],[W.xptr, W.sptr]);
+  const scores=new Array(W.ncls);
+  for(let k=0;k<W.ncls;k++) scores[k]=m.HEAP32[(W.sptr>>2)+k];
+  const predIdx=m.ccall('tmu_predict','number',['number'],[W.xptr]);
+  let activated=null, clauseOut=null, nact=0;
+  if(full){
+    m.ccall('tmu_clause_fire_all','void',['number','number'],[W.xptr, W.sptr]);
+    activated=[]; clauseOut={};
+    for(let id=0; id<W.total; id++){
+      const fire=m.HEAP32[(W.sptr>>2)+id];
+      const c=W.byId[id]; const w=c?c.weight:0;
+      // shape-compatible with the FPTM clauseOut: out = |weight| when fired (for ranking),
+      // contrib carries the true signed vote.
+      clauseOut[id]={out: fire?Math.abs(w):0, viol: fire?0:1, fire, contrib: fire?w:0};
+      if(fire){ nact++; activated.push(id); }
+    }
+  }
+  return {predIdx, predLabel:W.classes[predIdx], scores, activated, clauseOut, nact};
+}
+
+// Unified evaluate: routes to whichever WASM engine is active, else JS. Same shape.
 function evalUnified(fv, full){
-  if(ENGINE_KIND==='wasm' && WASM) return evalSampleWasm(WASM, fv, full);
+  if(ENGINE_KIND==='wasm' && WASM){
+    return (WASM.kind==='tmu') ? evalSampleWasmTMU(WASM, fv, full) : evalSampleWasm(WASM, fv, full);
+  }
   return evalSample(ENGINE, fv, full);
 }
 
@@ -654,14 +710,15 @@ function loadAtlas(obj, name){
     $$('#tabs button[data-tab="bits"]').forEach(b=>b.classList.toggle('hidden', BITS.length===0));
     renderOverview(); renderFeatures(); renderBits(); setupEncoding(); setupClauses(); renderActivityStatic();
     if(PRED){ recompute(); } else { maybeSwitchPredTab(); }
-    // try to bring up the WASM engine in the background; on success it becomes
+    // try to bring up a WASM engine in the background; on success it becomes
     // the active inference path and predictions are recomputed through it.
-    buildEngineWasm(obj).then(W=>{
-      if(W && W.total===ENGINE.clauses.length){      // shapes agree -> safe to use
-        // sanity: WASM prediction must match JS on a probe before switching
-        WASM = W; ENGINE_KIND = 'wasm'; setSrcName(name, obj);
-        if(PRED) recompute();
-      }
+    // TMU models (atlas.tmu, weighted-crisp) use the tmu.c kernel; the graded
+    // GLADE+FPTM models use the fptm.c kernel.
+    const wasmReady = (obj.tmu && obj.tmu.engine==='weighted-crisp')
+      ? buildEngineWasmTMU(obj)
+      : buildEngineWasm(obj).then(W=> (W && W.total===ENGINE.clauses.length) ? W : null);
+    wasmReady.then(W=>{
+      if(W){ WASM=W; ENGINE_KIND='wasm'; setSrcName(name, obj); if(PRED) recompute(); }
     }).catch(()=>{ /* keep JS engine */ });
   }catch(e){ showErr('Failed to load atlas: '+e.message); }
 }
