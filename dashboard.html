@@ -1,0 +1,449 @@
+<!DOCTYPE html>
+<html lang="en"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>TsetlinLab — Visual Decision Dashboard</title>
+<style>
+:root{
+  --bg:#0a0c12;--p1:#12151f;--p2:#171b27;--line:#262c3b;--fg:#e8ebf2;--mut:#8b94a7;
+  --pos:#46d39a;--neg:#ff6b8b;--acc:#6ea8ff;--warn:#ffcc66;--win:#46d39a;
+  --c0:#ff6b8b;--c1:#ffcc66;--c2:#6ea8ff; /* per-class hues */
+  --grid:#1d2230;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{background:var(--bg);color:var(--fg);font:13px/1.4 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif}
+body{padding:0 0 40px}
+.bar{display:flex;align-items:center;gap:14px;padding:12px 18px;background:linear-gradient(180deg,#12161f,#0d1017);border-bottom:1px solid var(--line);position:sticky;top:0;z-index:30}
+.bar h1{font-size:15px;font-weight:700;letter-spacing:.3px}
+.bar h1 b{color:var(--acc)}
+.bar .meta{color:var(--mut);font-size:11px}
+.spacer{flex:1}
+.bar .legend{display:flex;gap:12px;font-size:11px;color:var(--mut);align-items:center}
+.bar .legend i{width:11px;height:11px;border-radius:3px;display:inline-block;vertical-align:middle;margin-right:4px}
+.loading{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:14px;background:var(--bg);z-index:100}
+.spin{width:46px;height:46px;border:4px solid var(--line);border-top-color:var(--acc);border-radius:50%;animation:spin 1s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+.err{color:var(--neg);max-width:560px;text-align:center;font-size:13px;line-height:1.6}
+
+.grid{display:grid;grid-template-columns:300px 1fr 360px;gap:14px;padding:14px 18px;align-items:start}
+@media(max-width:1200px){.grid{grid-template-columns:1fr}}
+.panel{background:var(--p1);border:1px solid var(--line);border-radius:14px;padding:13px 15px}
+.panel h2{font-size:10.5px;text-transform:uppercase;letter-spacing:.09em;color:var(--mut);margin-bottom:10px;display:flex;align-items:center;gap:7px}
+.panel h2 .dot{width:7px;height:7px;border-radius:50%;background:var(--acc)}
+
+/* ---------- sample selector grid ---------- */
+#sampGrid{display:grid;grid-template-columns:repeat(auto-fill,14px);gap:3px;max-height:360px;overflow:auto;padding:2px}
+.scell{width:14px;height:14px;border-radius:3px;cursor:pointer;opacity:.82;transition:transform .12s,box-shadow .12s;position:relative}
+.scell:hover{transform:scale(1.5);z-index:5;box-shadow:0 0 0 2px #fff6}
+.scell.sel{box-shadow:0 0 0 2px #fff,0 0 10px 2px var(--acc);transform:scale(1.4);z-index:6}
+.scell.wrong{border:2px solid #fff}
+.filtrow{display:flex;gap:6px;margin-bottom:9px;flex-wrap:wrap}
+.chipbtn{font-size:11px;border:1px solid var(--line);background:var(--p2);color:var(--mut);border-radius:999px;padding:3px 10px;cursor:pointer}
+.chipbtn.on{color:var(--fg);border-color:var(--acc);background:#1b2740}
+.sampmeta{font-size:11px;color:var(--mut);margin-top:8px}
+
+/* ---------- class arena (center top) ---------- */
+#arena{display:flex;gap:14px;align-items:flex-end;justify-content:center;min-height:230px;padding:8px 4px 0}
+.pillar{flex:1;max-width:170px;display:flex;flex-direction:column;align-items:center;gap:6px}
+.pillarbar{width:100%;height:170px;background:var(--grid);border-radius:10px 10px 4px 4px;position:relative;overflow:hidden;border:1px solid var(--line)}
+.pillarfill{position:absolute;left:0;right:0;bottom:0;border-radius:0 0 3px 3px;transition:height .8s cubic-bezier(.2,.8,.2,1)}
+.pillar .cname{font-size:12px;font-weight:600;text-align:center;height:30px;display:flex;align-items:center}
+.pillar .cscore{font-size:22px;font-weight:800;font-variant-numeric:tabular-nums}
+.pillar.win .pillarbar{box-shadow:0 0 22px -2px var(--win),inset 0 0 0 2px var(--win)}
+.pillar.win .cname{color:var(--win)}
+.crown{position:absolute;top:6px;left:50%;transform:translateX(-50%);font-size:18px;filter:drop-shadow(0 0 6px var(--win));animation:bob 1.6s ease-in-out infinite}
+@keyframes bob{50%{transform:translateX(-50%) translateY(-4px)}}
+.outcome{display:flex;align-items:center;justify-content:center;gap:14px;margin-top:6px;font-size:12px;color:var(--mut)}
+.badge{font-weight:700;border-radius:6px;padding:2px 9px;font-size:11px}
+.badge.ok{background:#143524;color:var(--pos)} .badge.no{background:#3a1622;color:var(--neg)}
+.margin-meter{height:8px;border-radius:4px;background:var(--grid);overflow:hidden;width:160px;border:1px solid var(--line)}
+.margin-fill{height:100%;background:linear-gradient(90deg,var(--warn),var(--win));transition:width .8s}
+
+/* ---------- decision flow (SVG sankey) ---------- */
+#flowWrap{overflow-x:auto}
+#flow{display:block;width:100%;min-width:560px}
+.flow .edge{fill:none;stroke-linecap:round;opacity:.55}
+.flow .node rect{rx:5}
+.flow text{fill:var(--fg);font-size:10px}
+.flow text.sub{fill:var(--mut);font-size:8.5px}
+.flow text.col{fill:var(--mut);font-size:9px;text-transform:uppercase;letter-spacing:.08em}
+.playing .edge{stroke-dasharray:var(--len);stroke-dashoffset:var(--len);animation:draw .7s ease forwards}
+.playing .node,.playing text{animation:fade .5s ease both}
+@keyframes draw{to{stroke-dashoffset:0}}
+@keyframes fade{from{opacity:0}to{opacity:1}}
+.flowbtns{display:flex;gap:8px;align-items:center;margin-top:8px}
+
+/* ---------- feature galaxy ---------- */
+#galaxy{display:block;width:100%}
+.gnode{cursor:pointer}
+.gnode:hover circle{stroke:#fff;stroke-width:2}
+
+/* ---------- clause matrix ---------- */
+#matrixWrap{max-height:300px;overflow:auto}
+.mxrow{display:flex;align-items:center;gap:2px;margin:2px 0}
+.mxcell{height:11px;flex:1;border-radius:2px;min-width:2px}
+.mxlabel{width:78px;font-size:10px;color:var(--mut);text-align:right;flex:none;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.mxhint{font-size:10px;color:var(--mut);margin-top:6px}
+
+/* fired-clause vote bars (right) */
+.fbar{display:grid;grid-template-columns:1fr 46px;gap:8px;align-items:center;margin:3px 0;font-size:11px}
+.fbar .track{height:14px;background:var(--grid);border-radius:3px;position:relative;overflow:hidden}
+.fbar .fill{position:absolute;top:0;bottom:0;border-radius:3px;transition:width .6s}
+.fbar .v{text-align:right;font-variant-numeric:tabular-nums;font-weight:700}
+.tag{display:inline-block;font-size:9px;font-weight:700;border-radius:3px;padding:0 5px}
+
+.hovercard{position:fixed;pointer-events:none;background:#0d1017f2;border:1px solid var(--acc);border-radius:9px;padding:8px 10px;z-index:60;display:none;min-width:150px;box-shadow:0 8px 24px #000a}
+.hovercard .hc-bars{display:flex;flex-direction:column;gap:3px;margin-top:5px}
+.hovercard .hc-bar{height:9px;border-radius:2px}
+.hovercard h4{font-size:11px;margin-bottom:2px}
+.full{grid-column:1/-1}
+.subgrid{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+@media(max-width:900px){.subgrid{grid-template-columns:1fr}}
+</style></head>
+<body>
+
+<div class="loading" id="loading">
+  <div class="spin"></div>
+  <div id="loadmsg" style="color:var(--mut)">loading model from GitHub Pages…</div>
+  <div class="err" id="loaderr"></div>
+</div>
+
+<div class="bar">
+  <h1>Tsetlin<b>Lab</b> · Visual Decision Dashboard</h1>
+  <span class="meta" id="meta"></span>
+  <span class="spacer"></span>
+  <span class="legend" id="classLegend"></span>
+</div>
+
+<div class="grid" id="app" style="display:none">
+  <!-- LEFT: sample selector -->
+  <div class="panel">
+    <h2><span class="dot"></span>Samples · pick one</h2>
+    <div class="filtrow" id="filtRow"></div>
+    <div id="sampGrid"></div>
+    <div class="sampmeta" id="sampMeta"></div>
+  </div>
+
+  <!-- CENTER: arena + flow + galaxy -->
+  <div style="display:flex;flex-direction:column;gap:14px">
+    <div class="panel">
+      <h2><span class="dot"></span>Class vote arena</h2>
+      <div id="arena"></div>
+      <div class="outcome" id="outcome"></div>
+    </div>
+    <div class="panel">
+      <h2><span class="dot"></span>Decision flow · readings → clauses → class</h2>
+      <div id="flowWrap"><svg id="flow"></svg></div>
+      <div class="flowbtns">
+        <button class="chipbtn on" id="replayBtn">▶ replay flow</button>
+        <span class="mxhint" id="flowhint"></span>
+      </div>
+    </div>
+    <div class="panel">
+      <h2><span class="dot"></span>Feature influence galaxy <span class="mxhint" style="text-transform:none;letter-spacing:0">— size = how many rules use it · colour = net polarity · ring = your value</span></h2>
+      <svg id="galaxy"></svg>
+    </div>
+  </div>
+
+  <!-- RIGHT: fired clauses + matrix -->
+  <div style="display:flex;flex-direction:column;gap:14px">
+    <div class="panel">
+      <h2><span class="dot"></span>Rules firing now · vote strength</h2>
+      <div id="firedBars"></div>
+    </div>
+    <div class="panel">
+      <h2><span class="dot"></span>Clause activation matrix</h2>
+      <div id="matrixWrap"></div>
+      <div class="mxhint">each cell = one rule · lit = fired for this sample · row split by class, ▲ supports / ▼ opposes</div>
+    </div>
+  </div>
+</div>
+
+<div class="hovercard" id="hover"></div>
+
+<script>
+"use strict";
+const $=s=>document.querySelector(s), $$=s=>[...document.querySelectorAll(s)];
+const SVGNS="http://www.w3.org/2000/svg";
+const CLR=['var(--c0)','var(--c1)','var(--c2)','#b06bff','#46d3c0','#ff944d','#9aa7ff','#ff6bd6','#7bd35a','#d3c246'];
+function clr(i){return CLR[i%CLR.length];}
+const fmt=v=>{ if(v==null||v==='')return''; const n=+v; if(!isFinite(n))return v; return Number.isInteger(n)?n:(+n.toPrecision(4)); };
+
+// ---- data URLs (raw files on Pages; strip any ?src/?csv the user pasted) ----
+const BASE="https://rakesh2109.github.io/TsetlinLab/data/";
+const ATLAS_URL=BASE+"gladetmu_wustl_atlas.json";
+const CSV_URL  =BASE+"gladetmu_wustl_predictions.csv";
+
+let ATLAS,CLASSES,CLAUSES,FEATURES,BITS,ENGINE,ROWS,COLS,FEATCOLS,AI,PI;
+let SEL=-1, FILTER='all';
+
+// ================= FPTM inference engine (bit-exact, in JS) =================
+function buildEngine(a){
+  const classes=a.model.classes.map(String), idx={}; classes.forEach((c,i)=>idx[c]=i);
+  const clauses=(a.clauses||[]).map(c=>({
+    id:c.id, cls:String(c.class), clsIdx:idx[String(c.class)], polarity:c.polarity,
+    sign:c.polarity==='positive'?1:-1, clamp:+c.clamp,
+    lits:(c.literals||[]).map(l=>({feature:l.feature, geq:(l.operator==='≥'), thr:+l.threshold}))
+  }));
+  return {classes,idx,clauses};
+}
+function evalSample(fv){
+  const n=ENGINE.classes.length, scores=new Array(n).fill(0), out=[];
+  for(const c of ENGINE.clauses){
+    let viol=0; for(const l of c.lits){ const x=fv[l.feature]; const sat=l.geq?(x>=l.thr):(x<l.thr); if(!sat)viol++; }
+    const o=c.clamp-viol>0?c.clamp-viol:0;
+    out.push(o);
+    if(o>0) scores[c.clsIdx]+=c.sign*o;
+  }
+  let best=0; for(let k=1;k<n;k++) if(scores[k]>scores[best])best=k;
+  return {predIdx:best,scores,out};
+}
+
+// ================= load =================
+async function boot(){
+  try{
+    const clean=u=>u.split('?')[0];
+    const [aj,ct]=await Promise.all([
+      fetch(clean(ATLAS_URL)).then(r=>{if(!r.ok)throw new Error('atlas '+r.status);return r.json();}),
+      fetch(clean(CSV_URL)).then(r=>{if(!r.ok)throw new Error('csv '+r.status);return r.text();})
+    ]);
+    ATLAS=aj; CLASSES=aj.model.classes.map(String); CLAUSES=aj.clauses; FEATURES=aj.features; BITS=aj.bits;
+    ENGINE=buildEngine(aj);
+    const lines=ct.split('\n').map(l=>l.replace('\r','')).filter(x=>x.length);
+    COLS=lines[0].split(','); ROWS=lines.slice(1).map(l=>l.split(','));
+    const fset=new Set(FEATURES.map(f=>f.name));
+    FEATCOLS=COLS.map((c,i)=>({name:c,col:i})).filter(o=>fset.has(o.name));
+    AI=COLS.indexOf('actual'); PI=COLS.indexOf('predicted');
+    initStatic();
+    $('#loading').style.display='none'; $('#app').style.display='grid';
+    selectSample(0);
+  }catch(e){
+    $('#loadmsg').textContent='Could not load data.';
+    $('#loaderr').innerHTML='Tried:<br>'+ATLAS_URL+'<br>'+CSV_URL+'<br><br>'+e.message+
+      '<br><br>If this is opened from file://, serve over http or host on Pages (CORS is open on the source).';
+  }
+}
+
+// values for a row -> {feature:value}
+function rowFV(r){ const fv={}; for(const fc of FEATCOLS){ const s=r[fc.col]; fv[fc.name]= (s===''||s==null)?NaN:+s; } return fv; }
+function classLabel(v){ if(v===''||v==null)return''; const s=String(v); if(CLASSES.indexOf(s)>=0)return s; if(/^-?\d+$/.test(s)){const k=+s; if(k>=0&&k<CLASSES.length)return CLASSES[k];} return s; }
+
+// ================= static scaffolding (legend, sample grid, galaxy, matrix) =
+let FEATSTAT=[]; // per feature: {name, usage, net}  net>0 mostly supports, etc.
+function initStatic(){
+  $('#meta').textContent=`${CLASSES.length} classes · ${CLAUSES.length} rules · ${BITS.length} bits · ${ROWS.length} samples`;
+  $('#classLegend').innerHTML=CLASSES.map((c,i)=>`<span><i style="background:${clr(i)}"></i>${c}</span>`).join('');
+
+  // feature stats: usage = #clauses mentioning it; net = signed clause polarity weight
+  const usage={},net={};
+  CLAUSES.forEach(c=>{ const seen=new Set();
+    (c.featureBands||[]).forEach(b=>{ if(seen.has(b.feature))return; seen.add(b.feature);
+      usage[b.feature]=(usage[b.feature]||0)+1; net[b.feature]=(net[b.feature]||0)+(c.polarity==='positive'?1:-1); }); });
+  FEATSTAT=FEATURES.map(f=>({name:f.name,usage:usage[f.name]||0,net:net[f.name]||0}))
+                   .sort((a,b)=>b.usage-a.usage);
+
+  // sample filter chips
+  $('#filtRow').innerHTML=['all','correct','wrong'].map(f=>`<span class="chipbtn ${f==='all'?'on':''}" data-f="${f}">${f}</span>`).join('')
+     + CLASSES.map((c,i)=>`<span class="chipbtn" data-f="cls:${i}" style="border-color:${clr(i)}">${c}</span>`).join('');
+  $$('#filtRow .chipbtn').forEach(b=>b.onclick=()=>{ FILTER=b.dataset.f; $$('#filtRow .chipbtn').forEach(x=>x.classList.toggle('on',x===b)); renderSampleGrid(); });
+
+  renderSampleGrid();
+  buildMatrixSkeleton();
+}
+
+// precompute predicted class per row (for grid colouring) — cached
+let PRED=null;
+function ensurePred(){ if(PRED)return; PRED=ROWS.map(r=>evalSample(rowFV(r)).predIdx); }
+function renderSampleGrid(){
+  ensurePred();
+  const g=$('#sampGrid'); g.innerHTML='';
+  let shown=0;
+  ROWS.forEach((r,i)=>{
+    const pi=PRED[i]; const truth=AI>=0?classLabel(r[AI]):null; const wrong=truth!=null&&truth!==CLASSES[pi];
+    if(FILTER==='correct'&&wrong)return; if(FILTER==='wrong'&&!wrong)return;
+    if(FILTER.startsWith('cls:')&&pi!==+FILTER.slice(4))return;
+    const d=document.createElement('div');
+    d.className='scell'+(i===SEL?' sel':'')+(wrong?' wrong':'');
+    d.style.background=clr(pi); d.dataset.i=i;
+    d.onclick=()=>selectSample(i);
+    g.appendChild(d); shown++;
+  });
+  $('#sampMeta').textContent=`${shown} shown · click a cell · white outline = mis-classified`;
+}
+
+// ================= clause matrix skeleton (clauses grouped by class) =========
+let MX=[]; // {id, clsIdx, polarity, el}
+function buildMatrixSkeleton(){
+  const wrap=$('#matrixWrap'); wrap.innerHTML=''; MX=[];
+  CLASSES.forEach((cls,ci)=>{
+    ['positive','negative'].forEach(pol=>{
+      const ids=CLAUSES.filter(c=>String(c.class)===cls&&c.polarity===pol).map(c=>c.id);
+      if(!ids.length)return;
+      const row=document.createElement('div'); row.className='mxrow';
+      const lab=document.createElement('div'); lab.className='mxlabel';
+      lab.textContent=(pol==='positive'?'▲ ':'▼ ')+cls; lab.style.color=clr(ci);
+      row.appendChild(lab);
+      ids.forEach(id=>{ const c=document.createElement('div'); c.className='mxcell'; c.style.background='var(--grid)';
+        c.dataset.id=id; MX.push({id,clsIdx:ci,polarity:pol,el:c}); row.appendChild(c); });
+      wrap.appendChild(row);
+    });
+  });
+}
+
+// ================= main: select a sample, drive everything =================
+function selectSample(i){
+  SEL=i; const r=ROWS[i]; if(!r)return;
+  $$('#sampGrid .scell').forEach(c=>c.classList.toggle('sel',+c.dataset.i===i));
+  const fv=rowFV(r); const res=evalSample(fv);
+  const truth=AI>=0?classLabel(r[AI]):null, predLbl=CLASSES[res.predIdx];
+  renderArena(res, truth, predLbl, i);
+  renderFired(fv,res);
+  renderMatrix(res);
+  renderGalaxy(fv,res);
+  renderFlow(fv,res,truth);
+}
+
+// ---- arena: class pillars ----
+function renderArena(res,truth,predLbl,i){
+  const sc=res.scores, mx=Math.max(1,...sc.map(Math.abs));
+  const ranked=sc.map((v,k)=>({k,v})).sort((a,b)=>b.v-a.v);
+  const win=res.predIdx, runner=ranked.find(o=>o.k!==win)||ranked[1]||{k:win,v:sc[win]};
+  $('#arena').innerHTML=CLASSES.map((c,k)=>{
+    const h=Math.max(4,Math.abs(sc[k])/mx*100), neg=sc[k]<0;
+    return `<div class="pillar ${k===win?'win':''}">
+      <div class="cscore" style="color:${clr(k)}">${fmt(sc[k])}</div>
+      <div class="pillarbar">${k===win?'<div class="crown">👑</div>':''}
+        <div class="pillarfill" style="height:${h}%;background:${neg?'linear-gradient(0deg,#5a2630,'+clr(k)+')':'linear-gradient(0deg,'+clr(k)+'88,'+clr(k)+')'}"></div></div>
+      <div class="cname">${c}</div></div>`;
+  }).join('');
+  const ok=truth!=null?truth===predLbl:null;
+  const margin=sc[win]-runner.v, marginPct=Math.min(100,margin/Math.max(1,mx)*100);
+  $('#outcome').innerHTML=
+    `<span>sample #${i}</span>`+
+    (truth!=null?`<span class="badge ${ok?'ok':'no'}">${ok?'✓ '+predLbl:'✗ '+predLbl+' (true: '+truth+')'}</span>`:`<span class="badge ok">${predLbl}</span>`)+
+    `<span>margin</span><span class="margin-meter"><span class="margin-fill" style="width:${marginPct}%"></span></span><span>${fmt(margin)} pts</span>`;
+}
+
+// ---- fired clause vote bars (top supporters of winner + objections) ----
+function renderFired(fv,res){
+  const win=res.predIdx;
+  const fired=CLAUSES.map((c,idx)=>({c,out:res.out[idx]})).filter(o=>o.out>0);
+  fired.sort((a,b)=>b.out-a.out);
+  const mx=Math.max(1,...fired.map(o=>o.out));
+  const top=fired.slice(0,16);
+  $('#firedBars').innerHTML = top.length? top.map(o=>{
+    const ci=ENGINE.idx[String(o.c.class)], supports=o.c.polarity==='positive';
+    const col=supports?clr(ci):'var(--neg)';
+    return `<div class="fbar">
+      <div class="track" title="${o.c.polarity} · ${o.c.class}"><div class="fill" style="width:${o.out/mx*100}%;background:${col}"></div>
+        <span style="position:absolute;left:6px;top:0;font-size:10px;line-height:14px;color:#fff;white-space:nowrap">
+        <span class="tag" style="background:${col}33;color:${col}">${supports?'▲':'▼'} ${o.c.class}</span></span></div>
+      <div class="v" style="color:${col}">${supports?'+':'−'}${o.out}</div></div>`;
+  }).join('') : '<div class="mxhint">no rule fired</div>';
+  $('#flowhint').textContent=`${fired.length} rules fired for this sample`;
+}
+
+// ---- clause matrix lights ----
+function renderMatrix(res){
+  MX.forEach(m=>{
+    const o=res.out[CLAUSES.findIndex(c=>c.id===m.id)];
+    if(o>0){ m.el.style.background=clr(m.clsIdx); m.el.style.opacity=Math.min(1,.35+o/24*0.65); m.el.style.boxShadow=`0 0 5px ${clr(m.clsIdx)}`; }
+    else { m.el.style.background='var(--grid)'; m.el.style.opacity=1; m.el.style.boxShadow='none'; }
+  });
+}
+
+// ---- feature galaxy (bubbles) ----
+function renderGalaxy(fv,res){
+  const svg=$('#galaxy'); const W=svg.clientWidth||620, H=300; svg.setAttribute('viewBox',`0 0 ${W} ${H}`); svg.innerHTML='';
+  const top=FEATSTAT.slice(0,22);
+  const maxU=Math.max(1,...top.map(f=>f.usage));
+  // pack in a loose grid
+  const cols=Math.ceil(Math.sqrt(top.length*W/H)), rows=Math.ceil(top.length/cols);
+  const cw=W/cols, ch=H/rows;
+  top.forEach((f,idx)=>{
+    const cx=(idx%cols+0.5)*cw, cy=(Math.floor(idx/cols)+0.5)*ch;
+    const rad=6+ (f.usage/maxU)*Math.min(cw,ch)*0.42;
+    const polCol = f.net>0?'var(--pos)':f.net<0?'var(--neg)':'var(--mut)';
+    const g=document.createElementNS(SVGNS,'g'); g.setAttribute('class','gnode');
+    const circ=document.createElementNS(SVGNS,'circle');
+    circ.setAttribute('cx',cx);circ.setAttribute('cy',cy);circ.setAttribute('r',rad);
+    circ.setAttribute('fill',polCol);circ.setAttribute('fill-opacity','.32');circ.setAttribute('stroke',polCol);circ.setAttribute('stroke-opacity','.8');
+    g.appendChild(circ);
+    // value ring: where this sample's value sits in the feature's range
+    const fdef=FEATURES.find(x=>x.name===f.name); const v=fv[f.name];
+    if(fdef&&isFinite(v)){ const lo=fdef.range[0],hi=fdef.range[1]; const frac=hi>lo?Math.max(0,Math.min(1,(v-lo)/(hi-lo))):0.5;
+      const ring=document.createElementNS(SVGNS,'circle'); ring.setAttribute('cx',cx);ring.setAttribute('cy',cy);ring.setAttribute('r',rad*0.5+frac*rad*0.5);
+      ring.setAttribute('fill','none');ring.setAttribute('stroke','#fff');ring.setAttribute('stroke-width','2');ring.setAttribute('stroke-opacity',.85); g.appendChild(ring);
+    }
+    const t=document.createElementNS(SVGNS,'text'); t.setAttribute('x',cx);t.setAttribute('y',cy+rad+10);t.setAttribute('text-anchor','middle');
+    t.setAttribute('class','sub'); t.textContent=f.name.length>11?f.name.slice(0,10)+'…':f.name; g.appendChild(t);
+    g.addEventListener('mousemove',e=>showHover(e,f,v)); g.addEventListener('mouseleave',hideHover);
+    svg.appendChild(g);
+  });
+}
+
+// ---- decision flow (animated sankey) ----
+function renderFlow(fv,res,truth){
+  const svg=$('#flow'); const win=res.predIdx;
+  // winner's firing positive clauses + runner-up
+  const ranked=res.scores.map((v,k)=>({k,v})).sort((a,b)=>b.v-a.v);
+  const runner=ranked.find(o=>o.k!==win); const showCls=[win].concat(runner&&runner.k!==win?[runner.k]:[]);
+  const fired=[];
+  CLAUSES.forEach((c,idx)=>{ if(res.out[idx]>0 && showCls.includes(ENGINE.idx[String(c.class)]) && c.polarity==='positive')
+    fired.push({c,out:res.out[idx],cls:ENGINE.idx[String(c.class)]}); });
+  fired.sort((a,b)=>b.out-a.out); const rules=fired.slice(0,6);
+  // features feeding those rules
+  const fOrder=[]; rules.forEach(o=>(o.c.featureBands||[]).forEach(b=>{ if(!fOrder.includes(b.feature))fOrder.push(b.feature); }));
+  const feats=fOrder.slice(0,7);
+  const W=620,H=Math.max(220,40+Math.max(feats.length,rules.length,showCls.length)*36);
+  svg.setAttribute('viewBox',`0 0 ${W} ${H}`); svg.setAttribute('height',H);
+  const colX=[18,250,470], nodeW=150;
+  const slot=(n,i)=>30+((H-40)/(n+1))*(i+1);
+  const fy={}; feats.forEach((f,i)=>fy[f]=slot(feats.length,i));
+  const ry=rules.map((o,i)=>slot(rules.length,i));
+  const cy={}; showCls.forEach((k,i)=>cy[k]=slot(showCls.length,i));
+  let s=`<text class="col" x="${colX[0]}" y="14">readings</text><text class="col" x="${colX[1]}" y="14">rules fired</text><text class="col" x="${colX[2]}" y="14">class</text>`;
+  // edges feature->rule
+  rules.forEach((o,ri)=>{ (o.c.featureBands||[]).forEach(b=>{ if(fy[b.feature]==null)return;
+    const x1=colX[0]+nodeW,y1=fy[b.feature],x2=colX[1],y2=ry[ri],mx=(x1+x2)/2;
+    const len=Math.hypot(x2-x1,y2-y1)*1.4;
+    s+=`<path class="edge" d="M${x1} ${y1}C${mx} ${y1} ${mx} ${y2} ${x2} ${y2}" stroke="#3a4a6a" stroke-width="1" style="--len:${len}"/>`; }); });
+  // edges rule->class (width ∝ out)
+  const mxo=Math.max(1,...rules.map(o=>o.out));
+  rules.forEach((o,ri)=>{ const x1=colX[1]+nodeW,y1=ry[ri],x2=colX[2],y2=cy[o.cls],mx=(x1+x2)/2;
+    const len=Math.hypot(x2-x1,y2-y1)*1.4;
+    s+=`<path class="edge" d="M${x1} ${y1}C${mx} ${y1} ${mx} ${y2} ${x2} ${y2}" stroke="${clr(o.cls)}" stroke-width="${1+3*o.out/mxo}" style="--len:${len}"/>`; });
+  // nodes
+  feats.forEach(f=>{ const y=fy[f]-14; s+=`<g class="node"><rect x="${colX[0]}" y="${y}" width="${nodeW}" height="28" fill="#1d2433" stroke="#33415e"/>
+    <text x="${colX[0]+8}" y="${fy[f]-1}">${f.length>17?f.slice(0,16)+'…':f}</text>
+    <text class="sub" x="${colX[0]+8}" y="${fy[f]+11}">= ${fmt(fv[f])}</text></g>`; });
+  rules.forEach((o,ri)=>{ const y=ry[ri]-14; s+=`<g class="node"><rect x="${colX[1]}" y="${y}" width="${nodeW}" height="28" fill="#16241a" stroke="${clr(o.cls)}"/>
+    <text x="${colX[1]+8}" y="${ry[ri]-1}">rule #${o.c.id}</text>
+    <text class="sub" x="${colX[1]+8}" y="${ry[ri]+11}">+${o.out} → ${CLASSES[o.cls].slice(0,12)}</text></g>`; });
+  if(!rules.length) s+=`<text class="sub" x="${colX[1]}" y="${H/2}">no positive rule fired</text>`;
+  showCls.forEach(k=>{ const y=cy[k]-16,wk=k===win; s+=`<g class="node"><rect x="${colX[2]}" y="${y}" width="${nodeW}" height="32" fill="#1f2431" stroke="${clr(k)}" stroke-width="${wk?2.5:1}"/>
+    <text x="${colX[2]+8}" y="${cy[k]-1}">${wk?'👑 ':''}${CLASSES[k].slice(0,15)}</text>
+    <text class="sub" x="${colX[2]+8}" y="${cy[k]+12}">total ${fmt(res.scores[k])}</text></g>`; });
+  svg.innerHTML=s;
+  playFlow();
+}
+function playFlow(){ const svg=$('#flow'); svg.classList.remove('playing'); void svg.getBoundingClientRect(); svg.classList.add('playing');
+  $$('#flow .edge').forEach((e,i)=>e.style.animationDelay=(i*40)+'ms');
+  $$('#flow .node,#flow text').forEach((e,i)=>e.style.animationDelay=Math.min(i*18,900)+'ms'); }
+$('#replayBtn').onclick=()=>{ if(SEL>=0) selectSample(SEL); };
+
+// ---- hover card ----
+function showHover(e,f,v){
+  const h=$('#hover'); h.style.display='block'; h.style.left=Math.min(innerWidth-180,e.clientX+14)+'px'; h.style.top=(e.clientY+14)+'px';
+  const fdef=FEATURES.find(x=>x.name===f.name);
+  let bars='';
+  if(fdef){ const lo=fdef.range[0],hi=fdef.range[1],frac=hi>lo?(v-lo)/(hi-lo):0.5;
+    bars=`<div class="hc-bars"><div class="hc-bar" style="background:linear-gradient(90deg,var(--acc) ${Math.max(0,Math.min(100,frac*100))}%,var(--grid) 0)"></div></div>
+    <div style="font-size:10px;color:var(--mut);margin-top:3px">value ${fmt(v)} in [${fmt(lo)},${fmt(hi)}]</div>`; }
+  h.innerHTML=`<h4 style="color:${f.net>0?'var(--pos)':f.net<0?'var(--neg)':'var(--fg)'}">${f.name}</h4>
+    <div style="font-size:10px;color:var(--mut)">used by ${f.usage} rules · net ${f.net>0?'+':''}${f.net} polarity</div>${bars}`;
+}
+function hideHover(){ $('#hover').style.display='none'; }
+
+boot();
+</script>
+</body></html>
