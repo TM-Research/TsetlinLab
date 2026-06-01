@@ -169,9 +169,13 @@ function clr(i){return CLR[i%CLR.length];}
 const fmt=v=>{ if(v==null||v==='')return''; const n=+v; if(!isFinite(n))return v; return Number.isInteger(n)?n:(+n.toPrecision(4)); };
 
 // ---- data URLs (raw files on Pages; strip any ?src/?csv the user pasted) ----
-const BASE="https://rakesh2109.github.io/TsetlinLab/data/";
-const ATLAS_URL=BASE+"gladetmu_wustl_atlas.json";
-const CSV_URL  =BASE+"gladetmu_wustl_predictions.csv";
+// relative base so it works on Pages AND any local server; ?model= picks the dataset
+const BASE="data/";
+const _valid=["wustl","nslkdd","ton_iot","medsec","gladetmu_wustl","gladetmu_nslkdd","gladetmu_ton_iot","gladetmu_medsec","tmu_wustl","tmu_nslkdd","tmu_ton_iot","tmu_medsec"];
+const _qm=new URLSearchParams(location.search).get('model');
+const MODEL=_valid.includes(_qm)?_qm:"gladetmu_wustl";
+const ATLAS_URL=BASE+MODEL+"_atlas.json";
+const CSV_URL  =BASE+MODEL+"_predictions.csv";
 
 let ATLAS,CLASSES,CLAUSES,FEATURES,BITS,ENGINE,ROWS,COLS,FEATCOLS,AI,PI;
 let SEL=-1, FILTER='all';

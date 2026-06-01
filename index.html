@@ -63,9 +63,27 @@
   </table>
   <div class="note">Same train/test split per dataset; per-dataset config matched across engines. <b>The binariser is decisive on hard datasets</b>: holding the engine fixed, GLADE bits lift TON_IoT from 83.0% → 96.6% and MedSec from 87.4% → 96.8% — with fewer bits. Click any cell's <b>view rules</b> to open that exact model and inspect its clauses, encoding and per-sample decision paths.</div>
 
-  <h2>Open the viewer directly</h2>
-  <p><a class="cta" href="viewer.html?src=data/wustl_atlas.json&csv=data/wustl_predictions.csv">Launch TsetlinLab viewer →</a></p>
-  <p style="color:var(--mut);font-size:13px;margin-top:10px">Or load any model: append <code>?src=data/&lt;name&gt;_atlas.json&amp;csv=data/&lt;name&gt;_predictions.csv</code> to <code>viewer.html</code>.</p>
+  <h2>Explore each dataset — three views per model</h2>
+  <table class="mx" style="border-spacing:8px">
+    <thead><tr><th></th>
+      <th class="colhdr"><span class="b">🔬 Viewer</span><span class="s">rules · encoding · explain (WASM inference)</span></th>
+      <th class="colhdr"><span class="b">📊 Dashboard</span><span class="s">all-visual decision dashboard</span></th>
+      <th class="colhdr"><span class="b">🎞️ Flow Explorer</span><span class="s">step-by-step animated, pick any sample</span></th>
+    </tr></thead>
+    <tbody id="dsRows"></tbody>
+  </table>
+  <p style="color:var(--mut);font-size:13px;margin-top:12px">Each dataset is directly linkable — e.g. <code>explorer.html?model=ton_iot</code> or <code>viewer.html?src=data/&lt;name&gt;_atlas.json&amp;csv=data/&lt;name&gt;_predictions.csv</code>.</p>
 </main>
+<script>
+// per-dataset page links (Viewer / Dashboard / Explorer)
+const DS=[['wustl','WUSTL-EHMS-2020'],['nslkdd','NSL-KDD'],['ton_iot','TON_IoT'],['medsec','MedSec-25']];
+document.getElementById('dsRows').innerHTML=DS.map(([k,h])=>{
+  const v=`viewer.html?src=data/${k}_atlas.json&csv=data/${k}_predictions.csv`;
+  const d=`dashboard.html?model=${k}`;
+  const e=`explorer.html?model=${k}`;
+  const cell=(href,txt)=>`<td style="text-align:center"><a class="vr" href="${href}">${txt} →</a></td>`;
+  return `<tr><th>${h}</th>${cell(v,'open viewer')}${cell(d,'open dashboard')}${cell(e,'open explorer')}</tr>`;
+}).join('');
+</script>
 <footer>TsetlinLab · interpretable Tsetlin Machines for IoT intrusion detection</footer>
 </body></html>
