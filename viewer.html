@@ -1,0 +1,1582 @@
+<!DOCTYPE html>
+<!--
+  GLADE + FPTM Atlas Viewer — a single-file, dependency-free browser UI for the
+  JSON produced by `python -m paper_2.atlas`.
+
+  What it does
+  ------------
+  * Overview / Features / Bits / Clauses tabs (model structure, searchable).
+  * Explain tab: load a *_predictions.csv (raw feature rows). The viewer then
+    RE-RUNS THE MODEL IN YOUR BROWSER (no server, no Python needed) to compute
+    each sample's class and the rules that fired — results appear automatically.
+  * Click any sample to see a plain-language, step-by-step decision path:
+    inputs → how each class scored → which rules matched and why → final class.
+  * Stays readable with 100+ classes via progressive disclosure (top-N + "show
+    all", winner-vs-runner-up focus).
+
+  Use it three ways:
+    1. Open this file directly in a browser, then "Load atlas JSON" (or drag a
+       *_atlas.json onto the page).  Optionally also load a *_predictions.csv.
+    2. Append ?src=<url|relative-path> (and optionally &csv=<url>) to auto-load
+       (needs an HTTP server, e.g. `python -m paper_2.atlas serve` then open
+       http://localhost:8000/viewer.html?src=wustl_atlas.json&csv=wustl_predictions.csv ).
+    3. `python -m paper_2.atlas <bundle> --dataset X --csv preds.csv --html out.html`
+       writes a copy of this page with BOTH the atlas and the samples embedded —
+       just open it and the explanations are already computed.
+-->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>GLADE + FPTM Atlas Viewer</title>
+<style>
+  :root{
+    --bg:#0f1117; --panel:#181b24; --panel2:#1f2431; --line:#2b3142;
+    --fg:#e6e8ee; --mut:#9aa3b2; --acc:#7aa2f7; --pos:#9ece6a; --neg:#f7768e;
+    --warn:#e0af68; --chip:#252b3a;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;font:14px/1.45 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;background:var(--bg);color:var(--fg)}
+  code,kbd,.mono{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
+  header{padding:14px 20px;border-bottom:1px solid var(--line);display:flex;gap:16px;align-items:center;flex-wrap:wrap;background:var(--panel)}
+  header h1{font-size:16px;margin:0;font-weight:600}
+  header .sub{color:var(--mut);font-size:12px}
+  .spacer{flex:1}
+  button,label.btn{background:var(--panel2);color:var(--fg);border:1px solid var(--line);border-radius:6px;padding:6px 12px;cursor:pointer;font-size:13px}
+  button:hover,label.btn:hover{border-color:var(--acc)}
+  button.linklike{background:none;border:none;color:var(--acc);padding:4px 2px;cursor:pointer}
+  input[type=file]{display:none}
+  input[type=text],input[type=search],select{background:var(--panel2);color:var(--fg);border:1px solid var(--line);border-radius:6px;padding:6px 9px;font-size:13px}
+  input[type=range]{vertical-align:middle}
+  main{padding:0 20px 60px}
+  .drop{margin:24px auto;max-width:760px;border:2px dashed var(--line);border-radius:12px;padding:48px 24px;text-align:center;color:var(--mut)}
+  .drop.hot{border-color:var(--acc);color:var(--fg);background:var(--panel)}
+  .tabs{display:flex;gap:4px;margin:16px 0;border-bottom:1px solid var(--line)}
+  .tabs button{border:none;border-radius:0;background:none;border-bottom:2px solid transparent;padding:9px 14px;color:var(--mut)}
+  .tabs button.on{color:var(--fg);border-bottom-color:var(--acc)}
+  .panel{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:16px 18px;margin-bottom:18px}
+  h2{font-size:14px;margin:0 0 12px;font-weight:600;color:var(--mut);text-transform:uppercase;letter-spacing:.05em}
+  .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:10px}
+  .kv{background:var(--panel2);border:1px solid var(--line);border-radius:8px;padding:10px 12px}
+  .kv .k{color:var(--mut);font-size:11px;text-transform:uppercase;letter-spacing:.04em}
+  .kv .v{font-size:18px;font-weight:600;margin-top:2px}
+  .chip{display:inline-block;background:var(--chip);border:1px solid var(--line);border-radius:999px;padding:2px 10px;margin:2px 4px 2px 0;font-size:12px}
+  table{width:100%;border-collapse:collapse;font-size:13px}
+  th,td{text-align:left;padding:7px 10px;border-bottom:1px solid var(--line);vertical-align:top}
+  th{color:var(--mut);font-weight:600;cursor:pointer;user-select:none;position:sticky;top:0;background:var(--panel)}
+  th.sorted::after{content:" ▾";color:var(--acc)}
+  th.sorted.asc::after{content:" ▴"}
+  tr:hover td{background:var(--panel2)}
+  tr.selrow td{background:#222a3d}
+  .toolbar{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:12px}
+  .toolbar .lbl{color:var(--mut);font-size:12px}
+  .muted{color:var(--mut)}
+  .pos{color:var(--pos)} .neg{color:var(--neg)} .warn{color:var(--warn)}
+  .badge{display:inline-block;border-radius:5px;padding:1px 7px;font-size:11px;font-weight:600;border:1px solid var(--line)}
+  .badge.pos{color:var(--pos);border-color:#33502a;background:#1a2417}
+  .badge.neg{color:var(--neg);border-color:#5a2630;background:#241418}
+  .badge.warn{color:var(--warn);border-color:#5a4a26;background:#241f14}
+  .clause{border:1px solid var(--line);border-radius:8px;padding:10px 12px;margin-bottom:8px;background:var(--panel2)}
+  .clause .hd{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:6px;font-size:12px;color:var(--mut)}
+  .clause .body{font-size:13px;line-height:1.7}
+  .lit{display:inline-block;background:var(--chip);border:1px solid var(--line);border-radius:6px;padding:1px 8px;margin:2px 3px;white-space:nowrap}
+  .lit.bad{border-color:#5a2630;background:#241418}
+  .lit b{color:var(--acc);font-weight:600}
+  .bitname{color:var(--mut);font-size:11px;margin-right:5px;font-family:ui-monospace,monospace}
+  .neg .bitname,.lit .bitname.neg{color:var(--neg)}
+  .op-geq{color:var(--pos)} .op-lt{color:var(--neg)}
+  .conj{color:var(--mut);margin:0 4px}
+  .pager{display:flex;gap:8px;align-items:center;justify-content:center;margin-top:12px;color:var(--mut)}
+  .thr-list{font-family:ui-monospace,monospace;font-size:12px;color:var(--mut)}
+  details summary{cursor:pointer;color:var(--acc)}
+  .hidden{display:none}
+  .err{color:var(--neg);padding:12px;border:1px solid var(--neg);border-radius:8px;background:#241418}
+  .note{color:var(--warn);font-size:12px}
+  a{color:var(--acc)}
+  .scrollbox{max-height:70vh;overflow:auto;border:1px solid var(--line);border-radius:8px}
+  /* ---- technical-detail disclosure: hidden unless body.tech-on ---- */
+  .tech{display:none}
+  body.tech-on .tech{display:inline}
+  body.tech-on .tech-block{display:block}
+  .tech-block{display:none}
+  /* ---- explanation / decision path ---- */
+  .step{border-left:3px solid var(--line);padding:2px 0 10px 14px;margin:0 0 6px 6px;position:relative}
+  .step .num{position:absolute;left:-13px;top:0;width:22px;height:22px;border-radius:50%;background:var(--panel2);border:1px solid var(--line);color:var(--mut);font-size:11px;font-weight:700;display:flex;align-items:center;justify-content:center}
+  .step h3{font-size:13px;margin:0 0 8px;font-weight:600}
+  .outcome{border-radius:10px;padding:14px 16px;margin-bottom:14px;border:1px solid var(--line)}
+  .outcome.ok{background:#16241a;border-color:#33502a}
+  .outcome.miss{background:#241418;border-color:#5a2630}
+  .outcome .big{font-size:20px;font-weight:700}
+  .bar{display:flex;align-items:center;gap:8px;margin:3px 0}
+  .bar .name{width:34%;min-width:90px;text-align:right;font-size:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .bar .track{flex:1;background:var(--panel2);border-radius:4px;height:16px;position:relative;border:1px solid var(--line)}
+  .bar .fill{position:absolute;top:0;bottom:0;border-radius:3px;width:var(--w,0)}
+  .bar .fill.pos{background:linear-gradient(90deg,#3a5a2a,#9ece6a)}
+  .bar .fill.neg{background:linear-gradient(90deg,#f7768e,#5a2630)}
+  .bar .val{width:54px;text-align:right;font-size:12px;font-variant-numeric:tabular-nums}
+  .bar.win .name{color:var(--pos);font-weight:700}
+  .bar.run .name{color:var(--acc);font-weight:600}
+  .rule{border:1px solid var(--line);border-radius:8px;padding:8px 10px;margin-bottom:7px;background:var(--panel2)}
+  .rule .rhd{display:flex;gap:8px;align-items:baseline;flex-wrap:wrap;font-size:12px;margin-bottom:5px}
+  .rule .rhd .pts{font-weight:700}
+  .cond{display:flex;gap:7px;align-items:baseline;padding:2px 0;font-size:13px}
+  .cond .mk{width:16px;flex:none;text-align:center}
+  .cond .txt{flex:1}
+  .cond .val{color:var(--mut);font-size:12px;white-space:nowrap}
+  .cond.met .mk{color:var(--pos)} .cond.miss .mk{color:var(--neg)} .cond.imp .mk{color:var(--warn)} .cond.metneg .mk{color:var(--mut)}
+  .rule.against{border-color:#4a2630;background:#201619}
+  .pts.neg{color:var(--neg)}
+  .feat-key{display:inline-block;background:var(--chip);border:1px solid var(--line);border-radius:6px;padding:1px 8px;margin:2px 4px 2px 0;font-size:12px}
+  .feat-key .fv{color:var(--acc);font-weight:600}
+  /* ---- grouped conditions: low / high / range / impossible buckets ---- */
+  .condgroups{display:flex;flex-direction:column;gap:9px}
+  .condgroup{border-left:3px solid var(--line);padding:1px 0 2px 10px}
+  .condgroup.lo{border-color:var(--acc)} .condgroup.hi{border-color:var(--pos)} .condgroup.rg{border-color:var(--warn)} .condgroup.imp{border-color:var(--neg)}
+  .cglabel{display:block;font-size:11px;color:var(--mut);text-transform:uppercase;letter-spacing:.04em;margin-bottom:4px}
+  .cgchips{display:flex;flex-wrap:wrap;gap:3px}
+  .lit.lo{border-color:#33415e} .lit.hi{border-color:#33502a} .lit.rg{border-color:#5a4a26} .lit.imp{border-color:#5a2630;background:#241418}
+  .lit .arrow{font-weight:700;margin-right:3px}
+  .lit.lo .arrow{color:var(--acc)} .lit.hi .arrow{color:var(--pos)} .lit.rg .arrow{color:var(--warn)} .lit.imp .arrow{color:var(--neg)}
+  .statetag{font-size:10px;font-weight:700;border-radius:4px;padding:0 5px;margin-left:5px;border:1px solid var(--line)}
+  .statetag.on{color:var(--pos);border-color:#33502a;background:#16241a}
+  .statetag.off{color:var(--mut);background:var(--chip)}
+  /* ---- flow animation (decision path reveals step-by-step) ---- */
+  @keyframes flowIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+  @keyframes barGrow{from{width:0}to{width:var(--w,0)}}
+  @keyframes dash{to{stroke-dashoffset:0}}
+  @keyframes fadeIn{from{opacity:0}to{opacity:1}}
+  .flow .anim{animation:flowIn .42s ease both}
+  .flow .bar .fill{animation:barGrow .75s cubic-bezier(.3,0,.2,1) both}
+  @media (prefers-reduced-motion: reduce){ .flow .anim,.flow .bar .fill,.flow svg *{animation:none!important} }
+
+  /* ---- diverging vote chart (SVG) ---- */
+  .votechart{width:100%}
+  .votechart .vlabel{font-size:12px;fill:var(--fg)}
+  .votechart .vlabel.win{fill:var(--pos);font-weight:700}
+  .votechart .vlabel.run{fill:var(--acc)}
+  .votechart .vval{font-size:11px;fill:var(--mut);font-variant-numeric:tabular-nums}
+  .votechart .axis{stroke:var(--line)} .votechart .axiszero{stroke:var(--mut)}
+  .votechart .gridtxt{font-size:9px;fill:var(--mut)}
+  .votechart rect.vbar.pos{fill:url(#gradPos)} .votechart rect.vbar.neg{fill:url(#gradNeg)}
+  .votechart rect.vbar.winbar{stroke:var(--pos);stroke-width:1.5}
+  .flow .votechart rect.vbar{animation:barGrow .7s cubic-bezier(.3,0,.2,1) both}
+
+  /* ---- thermometer feature gauge (SVG) ---- */
+  .gauge{margin:7px 0}
+  .gauge .glabel{display:flex;justify-content:space-between;font-size:12px;margin-bottom:2px}
+  .gauge .gname{font-weight:600}
+  .gauge svg{display:block;width:100%}
+  .gauge .track{fill:var(--panel2);stroke:var(--line)}
+  .gauge .zone-on{fill:rgba(158,206,106,.18)}   /* value reaches threshold = ON region */
+  .gauge .zone-off{fill:rgba(122,162,247,.12)}
+  .gauge .thr{stroke:var(--mut);stroke-width:1;stroke-dasharray:3 2}
+  .gauge .thr.bind{stroke:var(--warn);stroke-width:1.5;stroke-dasharray:none}
+  .gauge .needle{stroke:var(--fg);stroke-width:2}
+  .gauge .dot{fill:var(--acc);stroke:var(--bg);stroke-width:1.5}
+  .gauge .dot.ok{fill:var(--pos)} .gauge .dot.bad{fill:var(--neg)}
+  .gauge .gt{font-size:9px;fill:var(--mut)}
+
+  /* ---- decision flow diagram (SVG: inputs -> rules -> classes) ---- */
+  .flowdiag{width:100%;background:var(--panel2);border:1px solid var(--line);border-radius:8px}
+  .flowdiag .node{rx:6}
+  .flowdiag .node.feat{fill:#1d2433;stroke:#33415e}
+  .flowdiag .node.rulepos{fill:#16241a;stroke:#33502a}
+  .flowdiag .node.ruleneg{fill:#241619;stroke:#5a2630}
+  .flowdiag .node.cls{fill:#1f2431;stroke:var(--line)}
+  .flowdiag .node.cls.win{fill:#1a2417;stroke:var(--pos);stroke-width:2}
+  .flowdiag text{fill:var(--fg);font-size:11px}
+  .flowdiag text.sub{fill:var(--mut);font-size:9px}
+  .flowdiag text.col{fill:var(--mut);font-size:10px;text-transform:uppercase;letter-spacing:.05em}
+  .flowdiag .edge{fill:none;stroke-linecap:round}
+  .flowdiag .edge.pos{stroke:var(--pos)} .flowdiag .edge.neg{stroke:var(--neg)} .flowdiag .edge.feat{stroke:#3a4a6a}
+  .flow .flowdiag .edge{stroke-dasharray:var(--len);stroke-dashoffset:var(--len);animation:dash .8s ease forwards}
+  .flow .flowdiag .node,.flow .flowdiag text{animation:fadeIn .5s ease both}
+  .leg{display:flex;gap:14px;flex-wrap:wrap;font-size:11px;color:var(--mut);margin:6px 0 2px}
+  .leg span{display:inline-flex;align-items:center;gap:4px}
+  .leg i{width:11px;height:11px;border-radius:3px;display:inline-block}
+  /* ---- "rules that fired" vote-bar list ---- */
+  .firedrules{display:flex;flex-direction:column;gap:5px;margin-top:6px}
+  .frrow{display:grid;grid-template-columns:minmax(150px,40%) 1fr 52px;gap:9px;align-items:center;font-size:12px}
+  .frlabel{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .frclass{display:inline-block;font-size:10px;font-weight:700;border-radius:4px;padding:0 5px;margin-right:5px;border:1px solid var(--line);background:var(--chip);color:var(--mut)}
+  .frrow.win .frclass{color:var(--pos);border-color:#33502a;background:#16241a}
+  .frbar{height:15px;background:var(--panel2);border:1px solid var(--line);border-radius:3px;position:relative;overflow:hidden}
+  .frfill{position:absolute;top:0;bottom:0;left:0;border-radius:2px;width:var(--w,0)}
+  .frfill.pos{background:linear-gradient(90deg,#3a5a2a,#9ece6a)}
+  .frfill.neg{background:linear-gradient(90deg,#f7768e,#5a2630)}
+  .frvotes{text-align:right;font-weight:700;font-variant-numeric:tabular-nums}
+  .frvotes.pos{color:var(--pos)} .frvotes.neg{color:var(--neg)}
+  .flow .frfill{animation:barGrow .6s cubic-bezier(.3,0,.2,1) both}
+  .rule .rname{font-weight:600;color:var(--fg)}
+  .rulevote{display:inline-block;height:9px;border-radius:2px;vertical-align:middle;margin:0 6px}
+  .rulevote.pos{background:var(--pos)} .rulevote.neg{background:var(--neg)}
+  /* ---- Activity tab: horizontal stat bars + class-wise table ---- */
+  .statbar{display:grid;grid-template-columns:minmax(120px,30%) 1fr 70px;gap:10px;align-items:center;font-size:12px;margin:3px 0}
+  .statbar .sname{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;text-align:right;color:var(--fg)}
+  .statbar .strack{height:17px;background:var(--panel2);border:1px solid var(--line);border-radius:3px;position:relative;overflow:hidden}
+  .statbar .sfill{position:absolute;top:0;bottom:0;left:0;border-radius:2px;background:linear-gradient(90deg,#2f4a6b,#7aa2f7);width:var(--w,0)}
+  .statbar .sfill.g{background:linear-gradient(90deg,#3a5a2a,#9ece6a)}
+  .statbar .sfill.r{background:linear-gradient(90deg,#5a4a26,#e0af68)}
+  .statbar .sval{text-align:right;color:var(--mut);font-variant-numeric:tabular-nums}
+  .anim-statbar .sfill{animation:barGrow .7s cubic-bezier(.3,0,.2,1) both}
+  .cwtable td .mini{display:inline-block;height:9px;border-radius:2px;background:var(--acc);vertical-align:middle}
+  .cwtable td.num{text-align:right;font-variant-numeric:tabular-nums}
+  .acthint{color:var(--mut);font-size:12px;margin-bottom:8px}
+  .actgrid{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+  @media (max-width:980px){ .actgrid{grid-template-columns:1fr} }
+  /* ---- Encoding tab: one feature -> bits -> literals ---- */
+  .enctoolbar{display:flex;gap:14px;align-items:center;flex-wrap:wrap;margin-bottom:10px}
+  .encval{font-size:22px;font-weight:700;color:var(--acc);font-variant-numeric:tabular-nums}
+  .encstep{counter-increment:encs;border-left:3px solid var(--line);padding:2px 0 12px 16px;margin:0 0 4px 8px;position:relative}
+  .encstep::before{content:counter(encs);position:absolute;left:-13px;top:0;width:24px;height:24px;border-radius:50%;background:var(--panel2);border:1px solid var(--line);color:var(--mut);font-size:12px;font-weight:700;display:flex;align-items:center;justify-content:center}
+  #encSteps{counter-reset:encs}
+  .encstep h3{font-size:13px;margin:0 0 8px;font-weight:600}
+  /* thermometer column of bits */
+  .therm{display:flex;flex-direction:column-reverse;gap:2px;max-width:560px}
+  .thermrow{display:grid;grid-template-columns:46px 150px 1fr 64px;gap:8px;align-items:center;font-size:12px}
+  .thermrow .bcell{height:20px;border-radius:3px;border:1px solid var(--line);display:flex;align-items:center;justify-content:center;font-weight:700;font-size:11px}
+  .thermrow .bcell.on{background:#16241a;border-color:#33502a;color:var(--pos)}
+  .thermrow .bcell.off{background:var(--panel2);color:var(--mut)}
+  .thermrow .bname{font-family:ui-monospace,monospace;color:var(--acc)}
+  .thermrow .bcond{color:var(--fg)}
+  .thermrow .bval{text-align:right;color:var(--mut);font-variant-numeric:tabular-nums}
+  .thermrow.boundary{outline:2px solid var(--warn);outline-offset:1px;border-radius:4px}
+  .litgrid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:4px}
+  @media (max-width:900px){ .litgrid{grid-template-columns:1fr} }
+  .litbox{border:1px solid var(--line);border-radius:8px;padding:10px 12px;background:var(--panel2)}
+  .litbox h4{margin:0 0 6px;font-size:12px;color:var(--mut);text-transform:uppercase;letter-spacing:.04em}
+  .litchip{display:inline-block;border:1px solid var(--line);border-radius:6px;padding:2px 8px;margin:2px 3px;font-size:12px;font-family:ui-monospace,monospace}
+  .litchip.on{border-color:#33502a;background:#16241a;color:var(--pos)}
+  .litchip.off{border-color:#33415e;background:#1a2130;color:var(--acc)}
+  .encbignum{font-size:13px}
+  .encbignum b{color:var(--acc)}
+  /* literal table: name | machine condition | plain meaning | satisfied? */
+  .littable{width:100%;border-collapse:collapse;font-size:12px}
+  .littable th{font-size:10px;color:var(--mut);text-transform:uppercase;letter-spacing:.04em;text-align:left;padding:4px 8px;border-bottom:1px solid var(--line);position:static}
+  .littable td{padding:5px 8px;border-bottom:1px solid var(--line);vertical-align:middle}
+  .littable td.lname{font-family:ui-monospace,monospace;color:var(--acc);white-space:nowrap}
+  .littable td.lname.off{color:var(--neg)}
+  .littable td.lcond{font-family:ui-monospace,monospace;white-space:nowrap}
+  .littable td.lsat{white-space:nowrap;text-align:center}
+  .littable tr.sat td{background:rgba(158,206,106,.06)}
+  .littable .yes{color:var(--pos);font-weight:700} .littable .no{color:var(--mut)}
+  /* ---- Explain split: sample list (left) + decision panel (right) ---- */
+  .explain-split{display:grid;grid-template-columns:minmax(320px,38%) 1fr;gap:14px;align-items:start}
+  #predListBox{max-height:80vh;min-width:0}
+  #predDetail{min-width:0;max-height:82vh;overflow:auto;position:sticky;top:10px}
+  @media (max-width:1100px){ .explain-split{grid-template-columns:1fr} #predDetail{position:static;max-height:none} }
+</style>
+</head>
+<body>
+<header>
+  <h1>GLADE + FPTM&nbsp;<span class="muted">Atlas</span></h1>
+  <span class="sub" id="srcname">no model loaded</span>
+  <span class="spacer"></span>
+  <label class="btn">Load atlas JSON<input type="file" id="fileJson" accept=".json,application/json"></label>
+  <label class="btn">Load samples CSV<input type="file" id="fileCsv" accept=".csv,text/csv"></label>
+</header>
+
+<main>
+  <div id="errbox"></div>
+
+  <div class="drop" id="drop">
+    <div style="font-size:15px;margin-bottom:6px">Drop a <code>*_atlas.json</code> here</div>
+    <div>…or use the <b>Load atlas JSON</b> button. Optionally also drop a <code>*_predictions.csv</code> of samples —
+      the viewer re-runs the model in your browser and explains each one.</div>
+    <div style="margin-top:14px;font-size:12px">Generate them with: <code class="mono">python -m paper_2.atlas results/&lt;ds&gt;/models/model.pkl --dataset &lt;ds&gt; -o ds_atlas.json --csv ds_predictions.csv</code></div>
+  </div>
+
+  <div id="app" class="hidden">
+    <div class="tabs" id="tabs">
+      <button data-tab="overview" class="on">Overview</button>
+      <button data-tab="features">Features</button>
+      <button data-tab="bits">Bits</button>
+      <button data-tab="encoding">Encoding</button>
+      <button data-tab="clauses">Rules</button>
+      <button data-tab="activity">Activity</button>
+      <button data-tab="predictions">Explain</button>
+    </div>
+
+    <!-- OVERVIEW -->
+    <section id="tab-overview">
+      <div class="panel">
+        <h2>Model</h2>
+        <div id="ov-model"></div>
+      </div>
+      <div class="panel">
+        <h2>Metadata</h2>
+        <div class="grid" id="ov-meta"></div>
+      </div>
+    </section>
+
+    <!-- FEATURES -->
+    <section id="tab-features" class="hidden">
+      <div class="panel">
+        <div class="toolbar">
+          <span class="lbl">search</span>
+          <input type="search" id="featSearch" placeholder="feature name…" style="min-width:240px">
+          <span class="lbl" id="featCount"></span>
+        </div>
+        <div class="scrollbox">
+          <table id="featTable">
+            <thead><tr>
+              <th data-k="idx">#</th><th data-k="name">name</th><th data-k="type">type</th>
+              <th data-k="lo">min</th><th data-k="hi">max</th><th data-k="nthr">#bits</th><th>thresholds</th>
+            </tr></thead>
+            <tbody></tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- BITS (legend) -->
+    <section id="tab-bits" class="hidden">
+      <div class="panel">
+        <div class="toolbar">
+          <span class="lbl">search</span>
+          <input type="search" id="bitSearch" placeholder="name (f1_3), feature, l#…" style="min-width:260px">
+          <span class="lbl muted">each original feature → up to 15 bits; bit <code>f&lt;i&gt;_&lt;k&gt;</code> = feature i, its k-th threshold = literal <code>l#</code></span>
+          <span class="spacer"></span>
+          <span class="lbl" id="bitCount"></span>
+        </div>
+        <div class="scrollbox">
+          <table id="bitTable">
+            <thead><tr>
+              <th data-k="l">l#</th><th data-k="name">name</th><th data-k="featureIndex">feat</th>
+              <th data-k="feature">feature</th><th data-k="localBit">bit k</th>
+              <th data-k="threshold">meaning</th>
+            </tr></thead>
+            <tbody></tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- ENCODING: one feature -> bits -> literals -->
+    <section id="tab-encoding" class="hidden">
+      <div class="panel">
+        <h2>How one feature becomes literals</h2>
+        <p class="muted" style="margin:0 0 10px">Pick a feature and a value. This shows the exact steps the model uses to turn a raw
+          reading into Boolean <b>literals</b> (the AND-pieces of every rule) — both the system method and a plain-language reading.</p>
+        <div class="enctoolbar">
+          <span class="lbl">feature</span><select id="encFeat" style="min-width:200px"></select>
+          <span class="lbl">value</span><input type="range" id="encRange" style="width:280px"><span class="encval" id="encValTxt"></span>
+          <input type="number" id="encNum" step="any" style="width:120px">
+        </div>
+        <div id="encSteps"></div>
+      </div>
+    </section>
+
+    <!-- CLAUSES / RULES -->
+    <section id="tab-clauses" class="hidden">
+      <div class="panel" style="padding:10px 14px">
+        <details id="contraExplain">
+          <summary><span class="warn">⚠ Why do some rules look contradictory?</span> <span class="muted" id="contraCount"></span></summary>
+          <div style="margin-top:8px;font-size:13px;line-height:1.6;color:var(--mut);max-width:880px">
+            <p style="margin:0 0 8px">Some rules ask for one feature to be both <b class="pos">ON</b> (≥ a threshold) <b>and</b> <b class="neg">OFF</b> (below it) at the same time — e.g. <span class="mono">Temp ≥ 27.27 AND Temp &lt; 27.27</span>. No value can satisfy that, so the viewer flags it <span class="badge warn">has impossible condition</span>. <b>This is expected, not a bug or a data error.</b> Here is why a Fuzzy-Pattern Tsetlin Machine produces them:</p>
+            <ul style="margin:0 0 8px;padding-left:20px">
+              <li><b>Each condition is learned independently.</b> Every literal (one threshold bit) is decided by its own little learner (a Tsetlin automaton) that only chooses “use this bit” / “don’t” for <i>its own</i> bit. Nothing coordinates two bits of the same feature, so occasionally both the “≥ t” bit and the “not ≥ t” bit get switched on.</li>
+              <li><b>A contradiction is nearly free here.</b> A rule does not need <i>every</i> condition to hold. It starts with a tolerance budget (the <span class="mono">clamp</span>) and just loses one point per unmet condition: <span class="mono">vote = max(clamp − misses, 0)</span>. A rule with ~50 conditions and a clamp of 8–15 barely notices one always-failing pair, so training has little pressure to remove it.</li>
+              <li><b>It’s leftover “noise”, and it’s harmless.</b> The impossible pair simply costs that rule 1 point on every sample; the rest of the rule still does the real work. The model’s predictions are exactly correct — these are just untidy literals.</li>
+            </ul>
+            <p style="margin:0">Tidier rules are possible with literal-pruning / clause-size-constraint training (CSC-TM, Contracting TM). Use the <b>“only impossible”</b> filter to inspect these rules; each shows a plain-language note about which feature is over-constrained.</p>
+          </div>
+        </details>
+      </div>
+      <div class="panel">
+        <div class="toolbar">
+          <span class="lbl">class</span><select id="clClass"></select>
+          <span class="lbl">role</span>
+          <select id="clPol"><option value="">all</option><option value="positive">supports class</option><option value="negative">argues against</option></select>
+          <span class="lbl">search</span><input type="search" id="clSearch" placeholder="feature name or threshold…" style="min-width:180px">
+          <span class="lbl">min features</span><input type="range" id="clMinF" min="0" max="0" value="0"><span id="clMinFV" class="muted">0</span>
+          <label title="only rules with an impossible (self-contradicting) condition"><input type="checkbox" id="clImp"> only impossible</label>
+          <span class="spacer"></span>
+          <span class="lbl" id="clCount"></span>
+        </div>
+        <div id="clList"></div>
+        <div class="pager" id="clPager"></div>
+      </div>
+    </section>
+
+    <!-- ACTIVITY -->
+    <section id="tab-activity" class="hidden">
+      <div class="panel" id="actEmpty">
+        <h2>Rule &amp; feature activity</h2>
+        <p class="muted">This tab shows <b>which features the model leans on most</b>, <b>how many rules fire</b>,
+          and <b>which exact rules fire most often</b> — measured by actually running the model over your samples.
+          Load a samples CSV (Explain tab) and it fills in automatically. A static view (from the rule bank alone)
+          is shown until then.</p>
+      </div>
+      <div id="actBody"></div>
+    </section>
+
+    <!-- PREDICTIONS / EXPLAIN -->
+    <section id="tab-predictions" class="hidden">
+      <div class="panel" id="predEmpty">
+        <h2>Explain classifications</h2>
+        <p class="muted">Load a CSV of samples (raw feature values, one row per sample) and the viewer
+          will <b>re-run the model right here in your browser</b> — no server or Python needed — then let you
+          click any sample to see, in plain language, exactly why it landed in its class.</p>
+        <p class="muted">Generate one with
+          <code class="mono">python -m paper_2.atlas results/&lt;ds&gt;/models/model.pkl --dataset &lt;ds&gt; --csv ds_predictions.csv</code>,
+          then use <b>Load samples CSV</b> above (or drag it onto the page).</p>
+      </div>
+
+      <div class="panel hidden" id="predSummary"></div>
+
+      <div class="panel hidden" id="predPanel">
+        <div class="toolbar">
+          <span class="lbl">filter</span><input type="search" id="predSearch" placeholder="any column…" style="min-width:200px">
+          <label><input type="checkbox" id="predErrOnly"> wrong answers only</label>
+          <label title="show every feature as a column (off = a few, to stay readable on wide datasets)"><input type="checkbox" id="colToggle"> all feature columns</label>
+          <label title="animate the decision path step-by-step when you pick a sample"><input type="checkbox" id="animToggle" checked> animate flow</label>
+          <label title="reveal rule ids, bit names, thresholds and operators"><input type="checkbox" id="techToggle"> technical details</label>
+          <span class="spacer"></span>
+          <span class="lbl" id="predCount"></span>
+        </div>
+        <div class="explain-split">
+          <div class="scrollbox" id="predListBox">
+            <table id="predTable"><thead></thead><tbody></tbody></table>
+            <div class="pager" id="predPager"></div>
+          </div>
+          <div class="panel" id="predDetail">
+            <h2>Decision path</h2>
+            <p class="muted">Click a sample on the left to trace its classification.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+  </div>
+</main>
+
+<script>
+"use strict";
+const $ = s => document.querySelector(s);
+const $$ = s => Array.from(document.querySelectorAll(s));
+const esc = s => String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const fmtNum = v => (v===null||v===undefined||v==='') ? '' : (typeof v==='number' ? (Number.isFinite(v)?(Number.isInteger(v)?v:(+v.toPrecision(6))):'n/a') : v);
+
+let ATLAS = null;        // parsed atlas JSON
+let CLAUSES = [];        // ATLAS.clauses
+let FEATURES = [];       // ATLAS.features
+let BITS = [];           // ATLAS.bits (legend)
+let ENGINE = null;       // compiled, DOM-free model (see buildEngine)
+let PRED = null;         // {cols, rows, name, featCols:[{name,col}]}
+let COMP = null;         // computed results per row {pred:[idx], correct:[bool|null], nact:[int], capped}
+let ANIMATE = true;      // animate the decision-path flow (off if user prefers reduced motion)
+const PAGE = 50;
+const TOP_CLASSES = 8;   // how many classes to show before "show all" (scales to 100+)
+const TOP_RULES = 5;     // supporting rules shown before "show more"
+const TOP_FEATCOLS = 6;  // feature columns shown in the table before "show all columns"
+
+// ===========================================================================
+//  MODEL ENGINE  (pure / DOM-free — also unit-tested headlessly via quickjs)
+//  Reconstructs FPTM inference exactly:
+//    bit            = value >= threshold
+//    literal "≥ t"  satisfied iff value >= t ; literal "< t" iff value < t
+//    clause output  = max(clamp - violations, 0)     (violations = unmet literals)
+//    class score    = Σ positive-clause outputs − Σ negative-clause outputs
+//    prediction     = argmax over classes (first max wins, == numpy.argmax)
+// ===========================================================================
+function buildEngine(atlas){
+  const classes = atlas.model.classes.map(String);
+  const clsIndex = {}; classes.forEach((c,i)=>clsIndex[c]=i);
+  const clauses = (atlas.clauses||[]).map(c=>({
+    id:c.id, cls:String(c.class), clsIdx:clsIndex[String(c.class)],
+    polarity:c.polarity, sign:(c.polarity==='positive'?1:-1),
+    clamp:+c.clamp,
+    lits:(c.literals||[]).map(l=>({feature:l.feature, geq:(l.operator==='≥'), thr:+l.threshold}))
+  }));
+  return {classes, clsIndex, clauses};
+}
+// Evaluate one sample. fv: {featureName: number}. Missing/NaN values cause the
+// literal to be unsatisfied (a violation) — matching the Python reference.
+function evalSample(engine, fv, full){
+  full = full !== false;                 // full=false: bulk pass, skip per-clause bookkeeping
+  const n = engine.classes.length;
+  const scores = new Array(n).fill(0);
+  const activated = full ? [] : null;
+  const clauseOut = full ? {} : null;    // id -> {out, viol}
+  let nact = 0;
+  for(const c of engine.clauses){
+    let viol = 0;
+    for(const l of c.lits){
+      const x = fv[l.feature];
+      const sat = l.geq ? (x >= l.thr) : (x < l.thr);   // NaN -> false -> violation
+      if(!sat) viol++;
+    }
+    const out = c.clamp - viol > 0 ? c.clamp - viol : 0;
+    if(full) clauseOut[c.id] = {out, viol};
+    if(out > 0){
+      nact++;
+      if(full) activated.push(c.id);
+      scores[c.clsIdx] += c.sign * out;
+    }
+  }
+  let best = 0;
+  for(let k=1;k<n;k++){ if(scores[k] > scores[best]) best = k; }
+  return {predIdx:best, predLabel:engine.classes[best], scores, activated, clauseOut, nact};
+}
+
+// expose for headless test harness (quickjs / node); harmless in the browser
+if (typeof globalThis !== 'undefined'){ globalThis.buildEngine = buildEngine; globalThis.evalSample = evalSample; }
+
+// ---------------------------------------------------------------- class labels
+// CSV actual/predicted columns may be integer class indices OR label strings.
+function classLabel(v){
+  if(v===undefined||v===null||v==='') return '';
+  const s = String(v);
+  if(!ATLAS) return s;
+  const classes = ATLAS.model.classes.map(String);
+  if(classes.indexOf(s) >= 0) return s;
+  if(/^-?\d+$/.test(s)){ const k=+s; if(k>=0 && k<classes.length) return classes[k]; }
+  return s;
+}
+
+// ---------------------------------------------------------------- loading
+function showErr(msg){ $('#errbox').innerHTML = '<div class="err">'+esc(msg)+'</div>'; }
+function clearErr(){ $('#errbox').innerHTML=''; }
+
+function loadAtlas(obj, name){
+  try{
+    if(!obj || !obj.model || !obj.metadata || !Array.isArray(obj.clauses) || !Array.isArray(obj.features))
+      throw new Error('Not a GLADE+FPTM atlas document (need model/metadata/features/clauses).');
+    ATLAS = obj; CLAUSES = obj.clauses; FEATURES = obj.features; BITS = Array.isArray(obj.bits)?obj.bits:[];
+    ENGINE = buildEngine(obj);
+    clearErr();
+    $('#drop').classList.add('hidden'); $('#app').classList.remove('hidden');
+    $('#srcname').textContent = (name||'embedded') + '  •  ' + obj.model.task + '  •  ' +
+      obj.model.classes.length + ' classes  •  ' + obj.metadata.numClauses + ' rules';
+    $$('#tabs button[data-tab="bits"]').forEach(b=>b.classList.toggle('hidden', BITS.length===0));
+    renderOverview(); renderFeatures(); renderBits(); setupEncoding(); setupClauses(); renderActivityStatic();
+    if(PRED){ recompute(); } else { maybeSwitchPredTab(); }
+  }catch(e){ showErr('Failed to load atlas: '+e.message); }
+}
+
+function readFile(file, cb){ const r=new FileReader(); r.onload=()=>cb(r.result); r.onerror=()=>showErr('Could not read '+file.name); r.readAsText(file); }
+
+$('#fileJson').addEventListener('change', e=>{ const f=e.target.files[0]; if(f) readFile(f, t=>{ try{ loadAtlas(JSON.parse(t), f.name);}catch(err){showErr('Invalid JSON in '+f.name+': '+err.message);} }); });
+$('#fileCsv').addEventListener('change', e=>{ const f=e.target.files[0]; if(f) readFile(f, t=>loadCsv(t, f.name)); });
+
+// drag & drop
+const drop=$('#drop'), body=document.body;
+['dragenter','dragover'].forEach(ev=>body.addEventListener(ev,e=>{e.preventDefault(); drop.classList.add('hot');}));
+['dragleave','drop'].forEach(ev=>body.addEventListener(ev,e=>{e.preventDefault(); if(ev==='dragleave'&&e.relatedTarget)return; drop.classList.remove('hot');}));
+body.addEventListener('drop',e=>{
+  e.preventDefault(); drop.classList.remove('hot');
+  for(const f of e.dataTransfer.files){
+    if(/\.json$/i.test(f.name)) readFile(f, t=>{ try{ loadAtlas(JSON.parse(t), f.name);}catch(err){showErr('Invalid JSON: '+err.message);} });
+    else if(/\.csv$/i.test(f.name)) readFile(f, t=>loadCsv(t, f.name));
+  }
+});
+
+// ---- embedded / URL auto-load ---------------------------------------------
+// Runs on window 'load' so every `let`/`const` below (predState, etc.) is
+// already initialised — calling loadCsv() inline here would hit a temporal
+// dead zone for those bindings.
+window.__ATLAS_EMBEDDED__ = window.__ATLAS_EMBEDDED__ || null;
+window.__PRED_EMBEDDED__ = window.__PRED_EMBEDDED__ || null;
+function autoLoad(){
+  const params = new URLSearchParams(location.search);
+  const src = params.get('src'), csv = params.get('csv');
+  if(window.__ATLAS_EMBEDDED__){
+    loadAtlas(window.__ATLAS_EMBEDDED__, '(embedded)');
+    if(window.__PRED_EMBEDDED__) loadCsv(window.__PRED_EMBEDDED__, '(embedded samples)');
+    return;
+  }
+  if(src){
+    fetch(src).then(r=>{ if(!r.ok) throw new Error(r.status+' '+r.statusText); return r.json(); })
+      .then(j=>{ loadAtlas(j, src); if(csv) return fetch(csv).then(r=>r.ok?r.text():Promise.reject(new Error(r.status+' '+r.statusText))).then(t=>loadCsv(t, csv)); })
+      .catch(e=>showErr('Could not fetch '+src+': '+e.message+'  (open via an HTTP server, e.g. `python -m paper_2.atlas serve`)'));
+  } else if(csv){
+    showErr('A model is required to interpret the samples — also pass ?src=<atlas.json> (or open an HTML exported with --html). ?csv= on its own does nothing.');
+  }
+}
+if(document.readyState==='complete') autoLoad();
+else window.addEventListener('load', autoLoad);
+
+// ---------------------------------------------------------------- tabs
+$$('#tabs button').forEach(b=>b.addEventListener('click',()=>{
+  $$('#tabs button').forEach(x=>x.classList.toggle('on', x===b));
+  ['overview','features','bits','encoding','clauses','activity','predictions'].forEach(t=>$('#tab-'+t).classList.toggle('hidden', t!==b.dataset.tab));
+}));
+function gotoTab(name){ const b=$('#tabs button[data-tab="'+name+'"]'); if(b) b.click(); }
+
+// ---------------------------------------------------------------- overview
+function renderOverview(){
+  const m=ATLAS.model, md=ATLAS.metadata;
+  const classes=m.classes.map(String), CAP=40;
+  const shown = classes.slice(0,CAP).map(c=>'<span class="chip">'+esc(c)+'</span>').join('');
+  const more = classes.length>CAP ? '<button class="linklike" id="ovMoreCls">+'+(classes.length-CAP)+' more…</button>' : '';
+  $('#ov-model').innerHTML =
+    '<div><span class="muted">type</span> &nbsp;<b>'+esc(m.type)+'</b> &nbsp;&nbsp; <span class="muted">task</span> &nbsp;<b>'+esc(m.task)+'</b></div>'+
+    '<div style="margin-top:8px"><span class="muted">classes ('+classes.length+'):</span> <span id="ovCls">'+shown+'</span>'+more+'</div>';
+  if(more) $('#ovMoreCls').onclick=()=>{ $('#ovCls').innerHTML=classes.map(c=>'<span class="chip">'+esc(c)+'</span>').join(''); $('#ovMoreCls').remove(); };
+  const order=['binariser','numClasses','numClausesPerClass','numClauses','numLiterals','T','s','L','LF','epochs','weightedClauses','created'];
+  const keys=order.filter(k=>k in md).concat(Object.keys(md).filter(k=>!order.includes(k)));
+  $('#ov-meta').innerHTML = keys.map(k=>'<div class="kv"><div class="k">'+esc(k)+'</div><div class="v">'+esc(String(md[k]))+'</div></div>').join('');
+}
+
+// ---------------------------------------------------------------- features
+let featSort={k:'idx',asc:true};
+function renderFeatures(){
+  const q=$('#featSearch').value.trim().toLowerCase();
+  let rows=FEATURES.map((f,i)=>({idx:i,name:f.name,type:f.type,lo:f.range&&f.range[0],hi:f.range&&f.range[1],nthr:(f.thresholds||[]).length,thr:f.thresholds||[]}));
+  if(q) rows=rows.filter(r=>String(r.name).toLowerCase().includes(q));
+  const dir=featSort.asc?1:-1, k=featSort.k;
+  rows.sort((a,b)=>{const x=a[k],y=b[k]; return (x<y?-1:x>y?1:0)*dir;});
+  $('#featCount').textContent = rows.length+' / '+FEATURES.length+' features';
+  $('#featTable tbody').innerHTML = rows.map(r=>{
+    const full = r.thr.length>8 ? '<details><summary>'+r.thr.length+' thresholds</summary><div class="thr-list">['+r.thr.map(fmtNum).join(', ')+']</div></details>' : '<span class="thr-list">['+r.thr.map(fmtNum).join(', ')+']</span>';
+    return '<tr><td>'+r.idx+'</td><td>'+esc(r.name)+'</td><td>'+esc(r.type)+'</td><td>'+fmtNum(r.lo)+'</td><td>'+fmtNum(r.hi)+'</td><td>'+r.nthr+'</td><td>'+full+'</td></tr>';
+  }).join('');
+  $$('#featTable th[data-k]').forEach(th=>{th.classList.toggle('sorted',th.dataset.k===featSort.k); th.classList.toggle('asc',featSort.asc);});
+}
+$('#featSearch').addEventListener('input',renderFeatures);
+$$('#featTable th[data-k]').forEach(th=>th.addEventListener('click',()=>{ if(featSort.k===th.dataset.k) featSort.asc=!featSort.asc; else {featSort.k=th.dataset.k;featSort.asc=true;} renderFeatures(); }));
+
+// ---------------------------------------------------------------- bits (legend)
+let bitSort={k:'l',asc:true};
+function renderBits(){
+  if(!BITS.length) return;
+  const q=$('#bitSearch').value.trim().toLowerCase();
+  let rows=BITS.slice();
+  if(q) rows=rows.filter(b=>String(b.name).toLowerCase().includes(q)||String(b.feature).toLowerCase().includes(q)||('l'+b.l)===q||String(b.l)===q);
+  const dir=bitSort.asc?1:-1, k=bitSort.k;
+  rows.sort((a,b)=>{const x=a[k],y=b[k]; return (x<y?-1:x>y?1:0)*dir;});
+  $('#bitCount').textContent=rows.length+' / '+BITS.length+' bits';
+  $('#bitTable tbody').innerHTML = rows.map(b=>
+    '<tr><td class="mono">l'+b.l+'</td><td class="mono"><b style="color:var(--acc)">'+esc(b.name)+'</b></td>'+
+    '<td>f'+b.featureIndex+'</td><td>'+esc(b.feature)+'</td><td>'+b.localBit+'</td>'+
+    '<td class="mono"><span class="op-geq">'+esc(b.feature)+' ≥ '+fmtNum(b.threshold)+'</span></td></tr>'
+  ).join('');
+  $$('#bitTable th[data-k]').forEach(th=>{th.classList.toggle('sorted',th.dataset.k===bitSort.k); th.classList.toggle('asc',bitSort.asc);});
+}
+$('#bitSearch').addEventListener('input',renderBits);
+$$('#bitTable th[data-k]').forEach(th=>th.addEventListener('click',()=>{ if(bitSort.k===th.dataset.k) bitSort.asc=!bitSort.asc; else {bitSort.k=th.dataset.k;bitSort.asc=true;} renderBits(); }));
+
+// ---------------------------------------------------------------- encoding (one feature -> literals)
+// How often each feature is used across the whole rule bank (its "repetition").
+function featureUseInRules(){
+  const use={};
+  CLAUSES.forEach(c=>{ const seen=new Set(); (c.literals||[]).forEach(l=>seen.add(l.feature)); seen.forEach(f=>use[f]=(use[f]||0)+1); });
+  return use;
+}
+function setupEncoding(){
+  const use=featureUseInRules();
+  // order features by how much the model repeats them (most-used first)
+  const order=FEATURES.map((f,i)=>({i,name:f.name,n:use[f.name]||0,nthr:(f.thresholds||[]).length}))
+    .filter(o=>o.nthr>0).sort((a,b)=>b.n-a.n);
+  if(!order.length){ $('#encSteps').innerHTML='<p class="muted">No threshold features to show.</p>'; return; }
+  $('#encFeat').innerHTML=order.map(o=>'<option value="'+o.i+'">'+esc(o.name)+'  ('+o.n+' rules · '+o.nthr+' bits)</option>').join('');
+  $('#encFeat').onchange=()=>encPick(+$('#encFeat').value);
+  encPick(order[0].i);
+}
+let encState={fi:0};
+function encPick(fi){
+  encState.fi=fi;
+  const f=FEATURES[fi], thr=(f.thresholds||[]).slice().sort((a,b)=>a-b);
+  const lo=f.range?+f.range[0]:thr[0], hi=f.range?+f.range[1]:thr[thr.length-1];
+  const span=(hi-lo)||1;
+  const rng=$('#encRange'); rng.min=lo-0.02*span; rng.max=hi+0.02*span; rng.step=span/500;
+  // start at the median threshold so a mix of ON/OFF shows
+  const start=thr.length?thr[Math.floor(thr.length/2)]:(lo+hi)/2;
+  rng.value=start; $('#encNum').value=+start.toFixed(4);
+  rng.oninput=()=>{ $('#encNum').value=+(+rng.value).toFixed(4); renderEncoding(); };
+  $('#encNum').oninput=()=>{ rng.value=$('#encNum').value; renderEncoding(); };
+  renderEncoding();
+}
+function renderEncoding(){
+  const fi=encState.fi, f=FEATURES[fi];
+  const v=+$('#encRange').value;
+  $('#encValTxt').textContent=fmtNum(+v.toFixed(4));
+  // bits = (value >= threshold), in ascending threshold order = thermometer
+  const bits=BITS.filter(b=>b.featureIndex-1===fi).slice().sort((a,b)=>a.threshold-b.threshold);
+  const use=featureUseInRules()[f.name]||0;
+  const states=bits.map(b=> v>=b.threshold ? 1:0);
+  const onCount=states.filter(x=>x).length;
+  // index of the boundary (last ON / first OFF)
+  let html='';
+
+  // step 1: repetition / why this feature
+  html+='<div class="encstep"><h3>This feature in the model</h3>'+
+    '<div class="encbignum"><b>'+esc(f.name)+'</b> is used by <b>'+use+'</b> of '+CLAUSES.length+' rules'+
+    ' and GLADE split it into <b>'+bits.length+'</b> threshold-bits (range '+fmtNum(f.range?f.range[0]:'?')+' … '+fmtNum(f.range?f.range[1]:'?')+').</div>'+
+    '<div class="muted" style="font-size:12px;margin-top:4px">Features the model relies on most are split into more bits and reused across more rules — that repetition is how a few signals drive most decisions.</div></div>';
+
+  // step 2: the rule GLADE uses (system method)
+  html+='<div class="encstep"><h3>The conversion rule (system method)</h3>'+
+    '<div class="encbignum">Every bit is <span class="mono">bit_k = ( '+esc(f.name)+' ≥ threshold_k )</span>. '+
+    'GLADE only <i>learns the thresholds</i>; the Tsetlin core then does <span class="mono">x .&gt; thresholds</span> — one comparison per threshold. '+
+    'This is a <b>thermometer code</b>: bits fill from the bottom up to the value.</div></div>';
+
+  // step 3: the thermometer itself, live
+  html+='<div class="encstep"><h3>Your value on the thermometer ('+onCount+' of '+bits.length+' bits ON)</h3>';
+  html+='<div class="muted" style="font-size:12px;margin-bottom:6px">filled (ON) = the reading reaches that threshold; empty (OFF) = it does not. The orange line is where your value sits.</div>';
+  html+='<div class="therm">';
+  bits.forEach((b,k)=>{
+    const on=states[k]===1;
+    const isBoundary = (on && (k+1>=bits.length || states[k+1]===0)); // last ON
+    html+='<div class="thermrow'+(isBoundary?' boundary':'')+'">'+
+      '<div class="bcell '+(on?'on':'off')+'">'+(on?'1':'0')+'</div>'+
+      '<div class="bname">'+esc(b.name)+' <span class="muted">(l'+b.l+')</span></div>'+
+      '<div class="bcond">'+esc(f.name)+' ≥ '+fmtNum(b.threshold)+'</div>'+
+      '<div class="bval">'+(on?'<span class="pos">ON</span>':'<span class="muted">OFF</span>')+'</div>'+
+    '</div>';
+  });
+  html+='</div></div>';
+
+  // step 4: literals (system method + values + human reading + live satisfied?)
+  html+='<div class="encstep"><h3>The literals (what rules pick from)</h3>'+
+    '<div class="muted" style="font-size:12px;margin-bottom:6px">Each threshold-bit gives the model <b>two</b> literals: the bit (must be <b>ON</b>, value ≥ threshold) and its negation <b>¬</b> (must be <b>OFF</b>, value &lt; threshold). A rule ANDs together whichever ones it learned. The right column shows whether <b>your value '+fmtNum(+v.toFixed(4))+'</b> satisfies each.</div>';
+  const litRow=(b,off)=>{
+    const onSat = v>=b.threshold;           // is the bit ON for this value?
+    const sat = off ? !onSat : onSat;       // ON literal satisfied iff bit ON; OFF literal iff bit OFF
+    const nm = (off?'¬':'')+esc(b.name);
+    const cond = off ? (esc(f.name)+' &lt; '+fmtNum(b.threshold)) : (esc(f.name)+' ≥ '+fmtNum(b.threshold));
+    const human = off ? (esc(f.name)+' is below '+fmtNum(b.threshold)) : (esc(f.name)+' is at least '+fmtNum(b.threshold));
+    return '<tr'+(sat?' class="sat"':'')+'>'+
+      '<td class="lname'+(off?' off':'')+'">'+nm+'</td>'+
+      '<td class="lcond">'+cond+'</td>'+
+      '<td>'+human+'</td>'+
+      '<td class="lsat">'+(sat?'<span class="yes">✓ yes</span>':'<span class="no">✗ no</span>')+'</td>'+
+    '</tr>';
+  };
+  const tableHead='<table class="littable"><thead><tr><th>literal</th><th>machine condition</th><th>plain meaning</th><th>your value '+fmtNum(+v.toFixed(4))+'?</th></tr></thead><tbody>';
+  html+='<div class="litgrid">'+
+    '<div class="litbox"><h4>“ON” literals (the bit) — '+esc(f.name)+' ≥ threshold</h4>'+tableHead+bits.map(b=>litRow(b,false)).join('')+'</tbody></table></div>'+
+    '<div class="litbox"><h4>“OFF” literals (¬, the negation) — '+esc(f.name)+' &lt; threshold</h4>'+tableHead+bits.map(b=>litRow(b,true)).join('')+'</tbody></table></div>'+
+  '</div></div>';
+
+  // step 5: human-readable band — how ONE rule expresses this feature
+  // a typical rule asks for a lower bound (an ON bit) and an upper bound (an OFF bit) -> a value window
+  let exLo=null, exHi=null;
+  for(let k=0;k<bits.length;k++){ if(states[k]) exLo=bits[k].threshold; }   // highest ON
+  for(let k=0;k<bits.length;k++){ if(!states[k]){ exHi=bits[k].threshold; break; } } // lowest OFF
+  const bandTxt = (exLo!=null&&exHi!=null) ? (fmtNum(exLo)+' ≤ '+esc(f.name)+' < '+fmtNum(exHi))
+                : (exLo!=null) ? (esc(f.name)+' ≥ '+fmtNum(exLo)) : (esc(f.name)+' < '+fmtNum(exHi));
+  html+='<div class="encstep"><h3>Human-readable reading</h3>'+
+    '<div class="encbignum">A rule that combines one “ON” literal and one “OFF” literal of '+esc(f.name)+
+    ' reads as a value window. For your value, the band straddling it is:<br><br>'+
+    '<span class="litchip on" style="font-size:14px">'+bandTxt+'</span>'+
+    '<br><br><span class="muted" style="font-size:12px">In plain words: “'+esc(f.name)+' is '+
+    (exLo!=null&&exHi!=null?('between '+fmtNum(exLo)+' and '+fmtNum(exHi)):(exLo!=null?('at least '+fmtNum(exLo)):('below '+fmtNum(exHi)))) +
+    '.” That is exactly how the rules and the Explain tab describe this feature.</span></div></div>';
+
+  $('#encSteps').innerHTML=html;
+}
+
+// ---------------------------------------------------------------- rules (clauses)
+let clState={page:0};
+function clauseFeatureCount(c){
+  if(typeof c.nFeatures==='number') return c.nFeatures;
+  return new Set((c.literals||[]).map(l=>l.feature)).size;
+}
+function clauseHasImpossible(c){ return (c.featureBands||[]).some(b=>b.empty); }
+function setupClauses(){
+  const classes=[...new Set(CLAUSES.map(c=>c.class))];
+  $('#clClass').innerHTML='<option value="">all classes</option>'+classes.map(c=>'<option value="'+esc(c)+'">'+esc(c)+'</option>').join('');
+  const maxF=Math.max(0,...CLAUSES.map(clauseFeatureCount));
+  const mnf=$('#clMinF'); mnf.max=maxF; mnf.value=0; $('#clMinFV').textContent='0';
+  ['#clClass','#clPol','#clSearch','#clMinF','#clImp'].forEach(s=>$(s).oninput=()=>{clState.page=0; if(s==='#clMinF')$('#clMinFV').textContent=$(s).value; renderClauses();});
+  // live count of impossible/contradictory rules for the explainer header
+  const nImp=CLAUSES.filter(clauseHasImpossible).length;
+  if($('#contraCount')) $('#contraCount').textContent = nImp
+    ? '— '+nImp+' of '+CLAUSES.length+' rules have one (click to learn why)'
+    : '— none in this model';
+  if($('#contraExplain')) $('#contraExplain').style.display = nImp ? '' : 'none';
+  renderClauses();
+}
+function filteredClauses(){
+  const cls=$('#clClass').value, pol=$('#clPol').value, q=$('#clSearch').value.trim().toLowerCase(), mnf=+$('#clMinF').value, imp=$('#clImp').checked;
+  return CLAUSES.filter(c=>{
+    if(cls && c.class!==cls) return false;
+    if(pol && c.polarity!==pol) return false;
+    if(clauseFeatureCount(c) < mnf) return false;
+    if(imp && !clauseHasImpossible(c)) return false;
+    if(q){ const hit=(c.literals||[]).some(l=>String(l.feature).toLowerCase().includes(q) || String(l.threshold).includes(q)); if(!hit) return false; }
+    return true;
+  });
+}
+// THERMOMETER rule logic. GLADE bits are all "feature ≥ threshold". So every
+// condition is "feature ≥ threshold" — required ON (the value reaches it) or
+// OFF (it doesn't). A rule NEVER mixes "<" and "≥"; it only flips ON/OFF.
+// Monotonicity lets us drop redundant bits: among ON thresholds only the
+// largest binds; among OFF thresholds only the smallest binds. A feature asked
+// to be ≥on (ON) and ≥off (OFF) with on≥off is impossible.
+function thermoConds(clause){
+  const byFeat={};
+  (clause.literals||[]).forEach(l=>{
+    const f=byFeat[l.feature]||(byFeat[l.feature]={on:[],off:[]});
+    (l.operator==='≥'?f.on:f.off).push(+l.threshold);
+  });
+  const out=[];
+  Object.keys(byFeat).sort().forEach(feat=>{
+    const f=byFeat[feat];
+    const onT = f.on.length ? Math.max.apply(null,f.on) : null;   // binding ON
+    const offT= f.off.length? Math.min.apply(null,f.off): null;   // binding OFF
+    const imp = onT!==null && offT!==null && onT>=offT;
+    if(onT!==null) out.push({feature:feat, thr:onT, state:'on',  impossible:imp});
+    if(offT!==null) out.push({feature:feat, thr:offT, state:'off', impossible:imp});
+  });
+  return out;
+}
+// Notation style depends on the engine: GLADE+FPTM is a thermometer machine, so
+// it keeps the faithful "≥ threshold, ON/OFF" form. TMU-engine models read more
+// naturally with the negation written as "feature < threshold".
+function ltNotation(){ const e=(ATLAS&&ATLAS.metadata&&ATLAS.metadata.engine)||''; return /tmu/i.test(String(e)); }
+function tgroup(){
+  const lt=ltNotation();
+  return [
+    {key:'on',  cls:'hi',  icon:'▲', label: lt ? 'must be at or above these thresholds (≥)' : 'must REACH these thresholds (≥ is ON)'},
+    {key:'off', cls:'lo',  icon: lt?'▼':'△', label: lt ? 'must be below these thresholds (<)' : 'must NOT reach these thresholds (≥ is OFF)'},
+    {key:'imp', cls:'imp', icon:'⚠', label: lt ? 'impossible — one feature must be both ≥ and < the same threshold' : 'impossible — one feature is asked to be ON and OFF at once'},
+  ];
+}
+function groupThermo(clause){
+  const g={on:[],off:[],imp:[]};
+  thermoConds(clause).forEach(cd=>{ g[cd.impossible?'imp':cd.state].push(cd); });
+  return g;
+}
+// One condition as a chip. ON literal -> "feature ≥ t". OFF literal -> ON/OFF tag
+// for FPTM, or "feature < t" for TMU (per the engine).
+function thermoChip(cd){
+  const lt=ltNotation();
+  const cls = cd.impossible?'imp':(cd.state==='on'?'hi':'lo');
+  if(cd.state==='off' && lt){
+    const arrow = cd.impossible?'⚠':'▼';
+    return '<span class="lit '+cls+'"><span class="arrow">'+arrow+'</span><b>'+esc(cd.feature)+'</b> &lt; '+esc(fmtNum(cd.thr))+'</span>';
+  }
+  const arrow = cd.impossible?'⚠':(cd.state==='on'?'▲':'△');
+  const tag = lt ? '' : ' <span class="statetag '+cd.state+'">'+(cd.state==='on'?'ON':'OFF')+'</span>';
+  return '<span class="lit '+cls+'"><span class="arrow">'+arrow+'</span><b>'+esc(cd.feature)+'</b> ≥ '+esc(fmtNum(cd.thr))+tag+'</span>';
+}
+function bandsHtml(c, mode){
+  const g=groupThermo(c);
+  if(!g.on.length && !g.off.length && !g.imp.length) return '<span class="muted">(no conditions — this rule always matches a little)</span>';
+  return '<div class="condgroups">'+tgroup().filter(t=>g[t.key].length).map(t=>{
+    const chips=g[t.key].map(thermoChip).join('');
+    return '<div class="condgroup '+t.cls+'"><span class="cglabel">'+t.icon+' '+t.label+' <span class="muted">('+g[t.key].length+')</span></span><div class="cgchips">'+chips+'</div></div>';
+  }).join('')+'</div>';
+}
+function clauseHtml(c){
+  const body=bandsHtml(c);
+  const nFeat=clauseFeatureCount(c);
+  const pos=c.polarity==='positive';
+  const role = pos ? '<span class="badge pos">votes FOR '+esc(c.class)+'</span>'
+                   : '<span class="badge neg">votes AGAINST '+esc(c.class)+'</span>';
+  // Make the two independent ideas explicit: the WHOLE rule's vote direction
+  // (polarity) vs each condition's ON/OFF state. An OFF condition is part of the
+  // pattern ("stays below this threshold"); it is NOT the rule voting the other way.
+  const lt=ltNotation();
+  const insideTxt = lt
+    ? ' when its conditions hold. Each condition is either <b>feature ≥ threshold</b> or <b>feature &lt; threshold</b>.'
+    : ' when its conditions hold. Inside it, <b>ON</b> = the reading reaches a threshold, <b>OFF</b> = it stays below — both kinds of condition appear in every rule.';
+  const roleNote = '<div class="muted" style="font-size:12px;margin-bottom:5px">This whole rule '+
+    (pos?'<span class="pos">adds points to <b>'+esc(c.class)+'</b></span>':'<span class="neg">takes points from <b>'+esc(c.class)+'</b></span>')+
+    insideTxt+'</div>';
+  const hasImp = clauseHasImpossible(c);
+  const imp = hasImp ? ' <span class="badge warn">has impossible condition</span>' : '';
+  const impNote = hasImp ? '<div class="warn" style="font-size:12px;margin-bottom:4px">⚠ This rule can never fully match — one feature is asked to be both '+(lt?'≥ and &lt;':'ON and OFF')+' the same threshold, so it always falls a little short of its strongest vote.</div>' : '';
+  return '<div class="clause" data-id="'+c.id+'">'+
+    '<div class="hd">'+role+imp+
+      '<span>'+nFeat+' feature'+(nFeat===1?'':'s')+'</span>'+
+      '<span class="tech">tolerance '+esc(c.clamp)+' · '+(c.literals||[]).length+' checks</span>'+
+      '<span class="muted tech">rule #'+c.id+'</span></div>'+
+    '<div class="body">'+roleNote+impNote+body+'</div></div>';
+}
+function renderClauses(){
+  const all=filteredClauses();
+  const pages=Math.max(1,Math.ceil(all.length/PAGE));
+  if(clState.page>=pages) clState.page=pages-1;
+  const slice=all.slice(clState.page*PAGE,(clState.page+1)*PAGE);
+  $('#clCount').textContent=all.length+' / '+CLAUSES.length+' rules';
+  $('#clList').innerHTML = slice.map(clauseHtml).join('') || '<p class="muted">no rules match</p>';
+  $('#clPager').innerHTML = pages>1 ?
+    '<button '+(clState.page<=0?'disabled':'')+' id="clPrev">‹ prev</button> page '+(clState.page+1)+' / '+pages+' <button '+(clState.page>=pages-1?'disabled':'')+' id="clNext">next ›</button>' : '';
+  if($('#clPrev')) $('#clPrev').onclick=()=>{clState.page--;renderClauses();};
+  if($('#clNext')) $('#clNext').onclick=()=>{clState.page++;renderClauses();};
+}
+
+// ===========================================================================
+//  PREDICTIONS / EXPLAIN
+// ===========================================================================
+function parseCsv(text){
+  const lines=text.replace(/\r\n?/g,'\n').split('\n').filter(l=>l.length>0);
+  const parseLine=l=>{const out=[];let cur='',q=false;for(let i=0;i<l.length;i++){const ch=l[i];
+    if(q){ if(ch==='"'){ if(l[i+1]==='"'){cur+='"';i++;} else q=false; } else cur+=ch; }
+    else { if(ch==='"') q=true; else if(ch===','){out.push(cur);cur='';} else cur+=ch; } }
+    out.push(cur); return out;};
+  const cols=parseLine(lines[0]);
+  const rows=lines.slice(1).map(parseLine);
+  return {cols,rows};
+}
+let predState={page:0,sel:-1,allCols:false};
+// Wide datasets (e.g. NSL-KDD's 118 features) would make a huge table; show a
+// few feature columns by default, with a "show all feature columns" toggle.
+function shownFeatCols(){ return predState.allCols ? PRED.featCols : PRED.featCols.slice(0, TOP_FEATCOLS); }
+function loadCsv(text,name){
+  if(!ATLAS || !ENGINE){ showErr('Load the model atlas JSON first, then the samples CSV.'); return; }
+  try{
+    const {cols,rows}=parseCsv(text);
+    // which CSV columns are model features?
+    const featSet=new Set(FEATURES.map(f=>f.name));
+    const featCols=cols.map((c,i)=>({name:c,col:i})).filter(o=>featSet.has(o.name));
+    if(featCols.length===0){
+      $('#predEmpty').classList.remove('hidden'); $('#predPanel').classList.add('hidden'); $('#predSummary').classList.add('hidden');
+      const eg=FEATURES.slice(0,3).map(f=>f.name).join(', ');
+      showErr('None of this CSV’s columns match the model’s '+FEATURES.length+' feature names, so the model cannot read these samples. Make sure the CSV was generated for THIS model — its headers should be feature names like: '+esc(eg)+' …');
+      gotoTab('predictions');
+      return;
+    }
+    PRED={cols,rows,name,featCols};
+    predState={page:0,sel:-1,allCols:false};
+    clearErr();
+    $('#predEmpty').classList.add('hidden'); $('#predPanel').classList.remove('hidden');
+    buildPredHeader();
+    recompute();                       // <-- AUTO-EXECUTION: run model + show results now
+    gotoTab('predictions');
+  }catch(e){ showErr('Failed to parse CSV '+(name||'')+': '+e.message); }
+}
+function maybeSwitchPredTab(){ if(!PRED){ $('#predEmpty').classList.remove('hidden'); $('#predSummary').classList.add('hidden'); $('#predPanel').classList.add('hidden'); } }
+
+// Build {featureName: value} for a CSV row.
+function rowFeatureValues(r){
+  const fv={};
+  for(const fc of PRED.featCols){ const s=r[fc.col]; fv[fc.name]= (s===undefined||s==='')?NaN:+s; }
+  return fv;
+}
+
+// AUTO-EXECUTION: re-run the model on every row, then render summary + first sample.
+// Also accumulates ACTIVITY stats: how often each clause fires, and how often
+// each feature is *used by a firing clause* (the "most-repeating feature" view).
+function recompute(){
+  if(!PRED || !ENGINE) return;
+  const ai=PRED.cols.findIndex(c=>/^actual$/i.test(c));
+  const n=PRED.rows.length;
+  const pred=new Array(n), correct=new Array(n), nact=new Array(n);
+  let nCorrect=0, nLabelled=0, sumFired=0;
+  const clauseFire=new Array(ENGINE.clauses.length).fill(0);   // per-clause fire count
+  const clauseVotes=new Array(ENGINE.clauses.length).fill(0);  // summed |votes| when fired
+  const featUse={};                                           // feature -> #(sample where a firing clause used it)
+  for(let i=0;i<n;i++){
+    const fv=rowFeatureValues(PRED.rows[i]);
+    const res=evalSample(ENGINE, fv, true);   // full: need per-clause outputs for activity
+    pred[i]=res.predIdx; nact[i]=res.nact; sumFired+=res.nact;
+    const featSeen=new Set();
+    for(let ci=0; ci<ENGINE.clauses.length; ci++){
+      const c=ENGINE.clauses[ci], o=res.clauseOut[c.id];
+      if(o && o.out>0){
+        clauseFire[ci]++; clauseVotes[ci]+=o.out;
+        for(const l of c.lits) featSeen.add(l.feature);
+      }
+    }
+    featSeen.forEach(f=>{ featUse[f]=(featUse[f]||0)+1; });
+    if(ai>=0 && PRED.rows[i][ai]!==''){
+      const truth=classLabel(PRED.rows[i][ai]);
+      const ok=(truth===ENGINE.classes[res.predIdx]); correct[i]=ok; nLabelled++; if(ok) nCorrect++;
+    } else correct[i]=null;
+  }
+  COMP={pred,correct,nact,ai,nCorrect,nLabelled,
+        clauseFire,clauseVotes,featUse,sumFired,nSamples:n};
+  renderSummary(); renderPred(); renderActivity();
+  // auto-open the first sample so an explanation is visible immediately
+  const first=predFiltered()[0];
+  if(first){ predState.sel=first.idx; renderPred(); showSample(first.idx); }
+}
+
+function renderSummary(){
+  const n=PRED.rows.length, classes=ENGINE.classes;
+  // distribution of predicted classes
+  const dist=new Array(classes.length).fill(0);
+  COMP.pred.forEach(k=>dist[k]++);
+  const order=dist.map((v,k)=>({k,v})).sort((a,b)=>b.v-a.v);
+  const top=order.slice(0,TOP_CLASSES);
+  const distBars = top.map(o=>{
+    const pct=Math.round(100*o.v/n);
+    return '<div class="bar"><div class="name">'+esc(classes[o.k])+'</div>'+
+      '<div class="track"><div class="fill pos" style="left:0;width:'+(o.v/n*100)+'%"></div></div>'+
+      '<div class="val">'+o.v+'</div></div>';
+  }).join('');
+  const moreCls = order.length>TOP_CLASSES ? '<button class="linklike" id="sumMore">show all '+classes.length+' classes…</button>' : '';
+  let acc='';
+  if(COMP.nLabelled>0){
+    const pct=(100*COMP.nCorrect/COMP.nLabelled);
+    acc='<div class="kv"><div class="k">accuracy</div><div class="v">'+pct.toFixed(1)+'%</div></div>'+
+        '<div class="kv"><div class="k">correct</div><div class="v">'+COMP.nCorrect+' / '+COMP.nLabelled+'</div></div>'+
+        '<div class="kv"><div class="k">wrong</div><div class="v">'+(COMP.nLabelled-COMP.nCorrect)+'</div></div>';
+  }
+  const nMatch=PRED.featCols.length, nFeat=FEATURES.length;
+  const matchTile='<div class="kv"><div class="k">features read</div><div class="v">'+nMatch+' / '+nFeat+'</div></div>';
+  const partialNote = nMatch<nFeat ? '<div class="note" style="margin-bottom:8px">⚠ Only '+nMatch+' of the model’s '+nFeat+' features were found in this CSV; the rest are treated as missing, which can skew predictions. Check the column names if results look off.</div>' : '';
+  $('#predSummary').classList.remove('hidden');
+  $('#predSummary').innerHTML =
+    '<h2>Results <span class="muted" style="text-transform:none;font-weight:400">— computed in your browser from '+n+' samples'+(PRED.name?' · '+esc(PRED.name):'')+'</span></h2>'+
+    partialNote+
+    '<div class="grid" style="margin-bottom:12px">'+
+      '<div class="kv"><div class="k">samples</div><div class="v">'+n+'</div></div>'+matchTile+acc+
+    '</div>'+
+    '<div class="muted" style="margin-bottom:6px">what the model predicted, by class</div>'+
+    '<div id="sumDist">'+distBars+'</div>'+moreCls;
+  if(moreCls) $('#sumMore').onclick=()=>{
+    $('#sumDist').innerHTML = order.map(o=>'<div class="bar"><div class="name">'+esc(classes[o.k])+'</div>'+
+      '<div class="track"><div class="fill pos" style="left:0;width:'+(o.v/n*100)+'%"></div></div><div class="val">'+o.v+'</div></div>').join('');
+    $('#sumMore').remove();
+  };
+}
+
+// ===========================================================================
+//  ACTIVITY TAB — feature importance, clause fire counts, class-wise rules
+// ===========================================================================
+function statBars(rows, opts){
+  // rows: [{name, val, pct, sub?, color?}]; opts: {fmt}
+  opts=opts||{};
+  if(!rows.length) return '<div class="muted">no data</div>';
+  return '<div class="anim-statbar">'+rows.map(r=>{
+    const w=Math.max(1.5, r.pct);
+    const col=r.color?(' '+r.color):'';
+    let nm=r.name; // truncated via CSS
+    return '<div class="statbar"><div class="sname" title="'+esc(r.name)+'">'+esc(nm)+'</div>'+
+      '<div class="strack"><div class="sfill'+col+'" style="--w:'+w+'%"></div></div>'+
+      '<div class="sval">'+esc(r.val)+'</div></div>';
+  }).join('')+'</div>';
+}
+function clauseClassColor(){ return null; }
+
+// Build a class-wise rules table: per class, how many positive/negative rules,
+// avg conditions, and (if available) how often its rules fire on the samples.
+function classWiseTable(fireByClass){
+  const classes=ENGINE.classes;
+  const rows=classes.map((cls,k)=>{
+    const cs=CLAUSES.filter(c=>String(c.class)===cls);
+    const pos=cs.filter(c=>c.polarity==='positive').length;
+    const neg=cs.filter(c=>c.polarity==='negative').length;
+    const avgF=cs.length?(cs.reduce((a,c)=>a+clauseFeatureCount(c),0)/cs.length):0;
+    const imp=cs.filter(clauseHasImpossible).length;
+    const fired=fireByClass?fireByClass[k]:null;
+    return {cls,pos,neg,avgF,imp,fired,total:cs.length};
+  });
+  const maxFired=fireByClass?Math.max(1,...rows.map(r=>r.fired||0)):0;
+  let h='<table class="cwtable"><thead><tr><th>class</th><th class="num">rules</th>'+
+    '<th class="num">supports (+)</th><th class="num">against (−)</th>'+
+    '<th class="num">avg features/rule</th><th class="num">impossible</th>'+
+    (fireByClass?'<th>rule firings on samples</th>':'')+'</tr></thead><tbody>';
+  rows.forEach(r=>{
+    h+='<tr><td><b>'+esc(r.cls)+'</b></td><td class="num">'+r.total+'</td>'+
+      '<td class="num pos">'+r.pos+'</td><td class="num neg">'+r.neg+'</td>'+
+      '<td class="num">'+r.avgF.toFixed(1)+'</td>'+
+      '<td class="num'+(r.imp?' warn':'')+'">'+r.imp+'</td>';
+    if(fireByClass){
+      const w=Math.round((r.fired||0)/maxFired*150);
+      h+='<td><span class="mini" style="width:'+w+'px"></span> <span class="muted">'+(r.fired||0).toLocaleString()+'</span></td>';
+    }
+    h+='</tr>';
+  });
+  return h+'</tbody></table>';
+}
+
+// Data-driven activity view (after CSV load): real fire counts + feature usage.
+function renderActivity(){
+  if(!COMP || !COMP.clauseFire){ renderActivityStatic(); return; }
+  $('#actEmpty').classList.add('hidden');
+  const classes=ENGINE.classes, N=COMP.nSamples;
+  // (1) most-repeating features: in how many samples a FIRING clause used them
+  const featRows=Object.keys(COMP.featUse).map(f=>({name:f,c:COMP.featUse[f]}))
+    .sort((a,b)=>b.c-a.c);
+  const maxFeat=Math.max(1,...featRows.map(r=>r.c));
+  const featTop=featRows.slice(0,15).map(r=>({name:r.name,val:Math.round(100*r.c/N)+'%',pct:100*r.c/maxFeat}));
+  // (2) clause fire counts -> stats + top clauses
+  const fired=COMP.clauseFire;
+  const idxSorted=fired.map((c,i)=>({i,c})).sort((a,b)=>b.c-a.c);
+  const nNeverFire=fired.filter(c=>c===0).length;
+  const maxFire=Math.max(1,...fired);
+  const topClauses=idxSorted.slice(0,15).filter(o=>o.c>0).map(o=>{
+    const eng=ENGINE.clauses[o.i]; const cl=CLAUSES.find(x=>x.id===eng.id)||eng;
+    return {name:clauseName(cl)+'  ['+eng.cls+(eng.polarity==='positive'?' +':' −')+']',
+            val:Math.round(100*o.c/N)+'%', pct:100*o.c/maxFire,
+            color:eng.polarity==='positive'?'g':'r'};
+  });
+  // (3) per-class firing totals
+  const fireByClass=new Array(classes.length).fill(0);
+  ENGINE.clauses.forEach((c,i)=>{ fireByClass[c.clsIdx]+=fired[i]; });
+
+  const avgFired=(COMP.sumFired/N).toFixed(1);
+  let h='';
+  h+='<div class="panel">'+
+     '<h2>Activity overview <span class="muted" style="text-transform:none;font-weight:400">— measured over '+N+' samples</span></h2>'+
+     '<div class="grid" style="margin-bottom:6px">'+
+       '<div class="kv"><div class="k">total rules</div><div class="v">'+CLAUSES.length+'</div></div>'+
+       '<div class="kv"><div class="k">rules that ever fire</div><div class="v">'+(CLAUSES.length-nNeverFire)+' / '+CLAUSES.length+'</div></div>'+
+       '<div class="kv"><div class="k">avg rules firing / sample</div><div class="v">'+avgFired+'</div></div>'+
+       '<div class="kv"><div class="k">never-firing rules</div><div class="v">'+nNeverFire+'</div></div>'+
+     '</div>'+
+     '<div class="acthint">A small set of features driving most rules is normal for a Tsetlin machine — these are its most-relied-upon signals.</div>'+
+     '</div>';
+  h+='<div class="actgrid">';
+  h+='<div class="panel"><h2>Most-relied-upon features</h2>'+
+     '<div class="acthint">how often a <b>firing</b> rule used each feature (share of samples). The top few are what the model mostly classifies on.</div>'+
+     statBars(featTop)+ (featRows.length>15?'<div class="muted" style="font-size:11px;margin-top:4px">showing top 15 of '+featRows.length+' used features</div>':'') +'</div>';
+  h+='<div class="panel"><h2>Most-firing rules</h2>'+
+     '<div class="acthint">the exact rules that fire most often (green = supports its class, amber = argues against). Share of samples where each fires.</div>'+
+     statBars(topClauses)+'</div>';
+  h+='</div>';
+  h+='<div class="panel"><h2>Rules by class</h2>'+
+     '<div class="acthint">how the rule bank is split across classes, and how much each class’s rules fired on your samples.</div>'+
+     classWiseTable(fireByClass)+'</div>';
+  $('#actBody').innerHTML=h;
+}
+
+// Static activity view (rule bank only, before any CSV): structure, not firings.
+function renderActivityStatic(){
+  if(!CLAUSES.length){ $('#actBody').innerHTML=''; return; }
+  $('#actEmpty').classList.remove('hidden');
+  // feature usage across the rule bank (how many rules reference each feature)
+  const use={};
+  CLAUSES.forEach(c=>{ const seen=new Set(); (c.literals||[]).forEach(l=>seen.add(l.feature)); seen.forEach(f=>use[f]=(use[f]||0)+1); });
+  const rows=Object.keys(use).map(f=>({name:f,c:use[f]})).sort((a,b)=>b.c-a.c);
+  const maxU=Math.max(1,...rows.map(r=>r.c));
+  const featTop=rows.slice(0,15).map(r=>({name:r.name,val:r.c+' rules',pct:100*r.c/maxU}));
+  let h='<div class="actgrid">';
+  h+='<div class="panel"><h2>Features used by the rule bank</h2>'+
+     '<div class="acthint">how many rules reference each feature (load a samples CSV to see real firing rates).</div>'+
+     statBars(featTop)+(rows.length>15?'<div class="muted" style="font-size:11px;margin-top:4px">showing top 15 of '+rows.length+'</div>':'')+'</div>';
+  h+='<div class="panel"><h2>Rules by class</h2>'+classWiseTable(null)+'</div>';
+  h+='</div>';
+  $('#actBody').innerHTML=h;
+}
+
+function buildPredHeader(){
+  // compact, readable header: result, truth, model says, then features
+  let h='<tr><th>#</th><th>result</th>';
+  if(PRED.cols.some(c=>/^actual$/i.test(c))) h+='<th>actual</th>';
+  h+='<th>model says</th>';
+  shownFeatCols().forEach(fc=>h+='<th>'+esc(fc.name)+'</th>');
+  const hidden=PRED.featCols.length-shownFeatCols().length;
+  if(hidden>0) h+='<th class="muted">+'+hidden+' more</th>';
+  $('#predTable thead').innerHTML=h+'</tr>';
+}
+function predFiltered(){
+  const q=$('#predSearch').value.trim().toLowerCase();
+  const errOnly=$('#predErrOnly').checked;
+  let rows=PRED.rows.map((r,idx)=>({idx,r}));
+  if(errOnly) rows=rows.filter(o=>COMP.correct[o.idx]===false);
+  if(q) rows=rows.filter(o=>o.r.some(v=>String(v).toLowerCase().includes(q)) || ENGINE.classes[COMP.pred[o.idx]].toLowerCase().includes(q));
+  return rows;
+}
+function renderPred(){
+  if(!COMP) return;
+  const all=predFiltered();
+  const pages=Math.max(1,Math.ceil(all.length/PAGE));
+  if(predState.page>=pages) predState.page=pages-1;
+  const slice=all.slice(predState.page*PAGE,(predState.page+1)*PAGE);
+  const ai=COMP.ai, hasActual=ai>=0;
+  $('#predCount').textContent=all.length+' / '+PRED.rows.length+' samples';
+  $('#predTable tbody').innerHTML = slice.map(o=>{
+    const i=o.idx, predLbl=ENGINE.classes[COMP.pred[i]];
+    const ok=COMP.correct[i];
+    const res = ok===null ? '<span class="muted">—</span>' : (ok?'<span class="badge pos">✓</span>':'<span class="badge neg">✗</span>');
+    let tds='<td class="muted">'+i+'</td><td>'+res+'</td>';
+    if(hasActual) tds+='<td>'+esc(classLabel(o.r[ai]))+'</td>';
+    tds+='<td><b>'+esc(predLbl)+'</b></td>';
+    shownFeatCols().forEach(fc=>tds+='<td>'+esc(fmtNum(o.r[fc.col]))+'</td>');
+    if(!predState.allCols && PRED.featCols.length>TOP_FEATCOLS) tds+='<td class="muted">…</td>';
+    return '<tr data-i="'+i+'" class="'+(i===predState.sel?'selrow':'')+'">'+tds+'</tr>';
+  }).join('') || '<tr><td class="muted">no samples match</td></tr>';
+  $('#predPager').innerHTML = pages>1 ? '<button '+(predState.page<=0?'disabled':'')+' id="pPrev">‹ prev</button> page '+(predState.page+1)+' / '+pages+' <button '+(predState.page>=pages-1?'disabled':'')+' id="pNext">next ›</button>' : '';
+  if($('#pPrev')) $('#pPrev').onclick=()=>{predState.page--;renderPred();};
+  if($('#pNext')) $('#pNext').onclick=()=>{predState.page++;renderPred();};
+  $$('#predTable tbody tr[data-i]').forEach(tr=>tr.onclick=()=>{ predState.sel=+tr.dataset.i; renderPred(); showSample(+tr.dataset.i); });
+}
+
+// Per-feature conditions of a clause, evaluated against a sample (for the path).
+function clauseConditions(clause, fv){
+  // thermometer conditions evaluated against the sample: ON cond met iff the
+  // "feature ≥ thr" bit is on (value reaches it); OFF cond met iff it is off.
+  return thermoConds(clause).map(cd=>{
+    const v=fv[cd.feature];
+    const bitOn = v>=cd.thr;
+    const ok = cd.state==='on' ? bitOn : !bitOn;
+    return {feature:cd.feature, thr:cd.thr, state:cd.state, impossible:cd.impossible, val:v, bitOn, ok};
+  }).sort((a,b)=>(b.ok?1:0)-(a.ok?1:0));   // matched conditions first
+}
+function condRow(cd, positive, withGauge){
+  positive = positive !== false;
+  let cls, mk;
+  if(cd.ok){ cls = positive ? 'met' : 'metneg'; mk = positive ? '✓' : '•'; }  // a met check on an "against" rule isn't in your favour
+  else { cls='miss'; mk='✗'; }
+  if(cd.impossible){ cls='imp'; mk='⚠'; }
+  const lt=ltNotation();
+  let cond;
+  if(cd.state==='off' && lt) cond='<b>'+esc(cd.feature)+'</b> &lt; '+esc(fmtNum(cd.thr));
+  else { const need = lt ? '' : ' <span class="statetag '+cd.state+'">'+(cd.state==='on'?'ON':'OFF')+'</span>'; cond='<b>'+esc(cd.feature)+'</b> ≥ '+esc(fmtNum(cd.thr))+need; }
+  const valTxt = Number.isFinite(cd.val)
+     ? ('your '+esc(cd.feature)+' = '+esc(fmtNum(cd.val))+(lt?'':(' → bit '+(cd.bitOn?'ON':'OFF'))))
+     : ('your '+esc(cd.feature)+' = (missing)');
+  let row='<div class="cond '+cls+'"><div class="mk">'+mk+'</div>'+
+    '<div class="txt">'+cond+'</div>'+
+    '<div class="val">'+valTxt+'</div></div>';
+  if(withGauge) row+='<div class="gauge">'+gaugeSvg(cd, cd.val)+'</div>';
+  return row;
+}
+function ruleCard(clause, fv, out, positive, gauges){
+  positive = positive !== false;
+  const conds=clauseConditions(clause, fv);
+  const nFeat=conds.length, met=conds.filter(c=>c.ok).length;
+  const lits=(clause.literals||[]);
+  const viol=lits.reduce((a,l)=>{ const v=fv[l.feature]; const sat=(l.operator==='≥')?(v>=l.threshold):(v<l.threshold); return a+(sat?0:1);},0);
+  const checks=lits.length;
+  const pts = positive ? '<span class="pts pos">+'+out+' points for this class</span>'
+                       : '<span class="pts neg">−'+out+' points (counts against this class)</span>';
+  // Plain-language reconciliation of WHY it scored: matched conditions + the
+  // rule's built-in tolerance for a few misses (always shown, not tech-gated).
+  let recon='<span class="muted">matched '+met+' of '+nFeat+' condition'+(nFeat===1?'':'s');
+  if(viol>0) recon+=' — close enough ('+(checks-viol)+' of '+checks+' checks met; this rule allows up to '+(clause.clamp-1)+' miss'+(clause.clamp-1===1?'':'es')+')';
+  recon+='</span>';
+  const vbarW=Math.max(8, Math.min(60, out*4));
+  const namerow='<div style="margin-bottom:4px"><span class="rname">'+esc(clauseName(clause))+'</span>'+
+    '<span class="rulevote '+(positive?'pos':'neg')+'" style="width:'+vbarW+'px" title="'+(positive?'+':'−')+out+' votes"></span>'+
+    '<span class="muted tech">'+clauseTag(clause)+'</span></div>';
+  const head='<div class="rhd">'+pts+recon+'</div>';
+  // gauges: show the value-vs-threshold number-line for the first few conditions
+  // (only on the highlighted/strongest card, to keep the panel light).
+  const GMAX=6;
+  const rows=conds.map((cd,idx)=>condRow(cd, positive, gauges && idx<GMAX)).join('');
+  const more=(gauges && conds.length>GMAX)?'<div class="muted" style="font-size:11px;margin-top:3px">+'+(conds.length-GMAX)+' more conditions (gauges shown for the first '+GMAX+')</div>':'';
+  return '<div class="rule'+(positive?'':' against')+'">'+namerow+head+rows+more+'</div>';
+}
+
+// Human-readable name for a clause instead of the meaningless internal id.
+// Built from the 1-2 most distinctive conditions, e.g.
+//   "high Flow IAT Max & low Active Max" — so a user sees WHAT the rule checks.
+function clauseName(clause){
+  const conds=thermoConds(clause);
+  if(!conds.length) return 'always-on rule';
+  // prefer ON conditions (what must be present), then OFF
+  const on=conds.filter(c=>c.state==='on'), off=conds.filter(c=>c.state==='off');
+  const pick=(on.length?on:off).slice(0,2);
+  const parts=pick.map(c=>(c.state==='on'?'high ':'low ')+c.feature);
+  let nm=parts.join(' & ');
+  const extra=conds.length-pick.length;
+  if(extra>0) nm+=' +'+extra;
+  return nm;
+}
+// Short id tag kept available behind the "technical details" toggle.
+function clauseTag(clause){ return 'rule #'+clause.id; }
+
+// "Rules that fired" — a compact, labelled vote-bar list. Each row: a named
+// rule, a bar sized by its vote, and the vote count (green = adds points to the
+// predicted class, red = takes points away). This is the at-a-glance answer to
+// "which clauses fired and how many votes?".
+function firedRulesHtml(fired, winLbl, classes){
+  if(!fired.length) return '<div class="muted">No rule fired for this sample.</div>';
+  const maxV=Math.max(1,...fired.map(o=>o.out));
+  return '<div class="firedrules">'+fired.map(o=>{
+    const forWin=String(o.c.class)===winLbl;
+    const adds = (o.c.polarity==='positive');   // positive clause adds to ITS class
+    const sign = adds ? '+' : '−';
+    const cls = adds ? 'pos':'neg';
+    const w=Math.max(3, o.out/maxV*100);
+    let clsName=String(o.c.class); if(clsName.length>14) clsName=clsName.slice(0,13)+'…';
+    return '<div class="frrow'+(forWin&&adds?' win':'')+'">'+
+      '<div class="frlabel"><span class="frclass">'+esc(clsName)+'</span>'+
+        '<span class="rname">'+esc(clauseName(o.c))+'</span>'+
+        '<span class="tech muted"> · '+clauseTag(o.c)+'</span></div>'+
+      '<div class="frbar"><div class="frfill '+cls+'" style="--w:'+w+'%"></div></div>'+
+      '<div class="frvotes '+cls+'">'+sign+o.out+'</div>'+
+    '</div>';
+  }).join('')+'</div>';
+}
+
+// ===========================================================================
+//  VISUAL COMPONENTS (SVG) — gauges, diverging vote chart, decision-flow diagram
+// ===========================================================================
+const SVGNS='http://www.w3.org/2000/svg';
+
+// (A) Diverging vote chart: one horizontal bar per class around a zero axis.
+// winners green to the right, negatives red to the left. Clear axis + values.
+function voteChartSvg(ranked, classes, winIdx, runIdx){
+  const rowH=22, padT=8, padB=18, labelW=132, valW=46, W=560;
+  const plotX=labelW, plotW=W-labelW-valW;
+  const n=ranked.length, H=padT+n*rowH+padB;
+  const maxAbs=Math.max(1,...ranked.map(o=>Math.abs(o.v)));
+  const zx=plotX+plotW/2;
+  const sx=v=> zx + (v/maxAbs)*(plotW/2);
+  let s='<svg class="votechart" viewBox="0 0 '+W+' '+H+'" preserveAspectRatio="xMidYMid meet" role="img">';
+  s+='<defs>'+
+     '<linearGradient id="gradPos" x1="0" x2="1"><stop offset="0" stop-color="#3a5a2a"/><stop offset="1" stop-color="#9ece6a"/></linearGradient>'+
+     '<linearGradient id="gradNeg" x1="1" x2="0"><stop offset="0" stop-color="#5a2630"/><stop offset="1" stop-color="#f7768e"/></linearGradient>'+
+     '</defs>';
+  // gridlines at -max,-half,0,half,max
+  [-1,-0.5,0,0.5,1].forEach(f=>{
+    const x=zx+f*(plotW/2);
+    s+='<line class="'+(f===0?'axiszero':'axis')+'" x1="'+x+'" y1="'+padT+'" x2="'+x+'" y2="'+(padT+n*rowH)+'"/>';
+    s+='<text class="gridtxt" x="'+x+'" y="'+(H-6)+'" text-anchor="middle">'+fmtNum(+(f*maxAbs).toFixed(1))+'</text>';
+  });
+  ranked.forEach((o,idx)=>{
+    const y=padT+idx*rowH, cy=y+rowH/2, x=sx(o.v), pos=o.v>=0;
+    const x0=Math.min(zx,x), w=Math.abs(x-zx);
+    const isWin=o.k===winIdx, isRun=o.k===runIdx&&!isWin;
+    const cls='vlabel'+(isWin?' win':isRun?' run':'');
+    let nm=classes[o.k]; if(nm.length>20) nm=nm.slice(0,19)+'…';
+    s+='<text class="'+cls+'" x="'+(labelW-8)+'" y="'+(cy+4)+'" text-anchor="end">'+(isWin?'★ ':'')+esc(nm)+'</text>';
+    s+='<rect class="vbar '+(pos?'pos':'neg')+(isWin?' winbar':'')+'" x="'+x0+'" y="'+(y+4)+'" width="'+Math.max(w,0.5)+'" height="'+(rowH-8)+'" rx="2" style="--w:'+Math.max(w,0.5)+'px;transform-box:fill-box;transform-origin:'+(pos?'left':'right')+' center"/>';
+    s+='<text class="vval" x="'+(W-6)+'" y="'+(cy+4)+'" text-anchor="end">'+fmtNum(o.v)+'</text>';
+  });
+  return s+'</svg>';
+}
+
+// (B) Thermometer gauge: the feature's value on a number-line, with each
+// threshold marked, the ON region (>= binding ON) shaded, and the value dot
+// colored by whether the clause condition was met. Makes ">= threshold, ON/OFF"
+// literally visible.
+function gaugeSvg(cd, value){
+  // cd: {feature, thr, state, ok, impossible}; build scale around thresholds+value
+  const feat=FEATURES.find(f=>f.name===cd.feature);
+  const thrs=(feat&&feat.thresholds&&feat.thresholds.length)?feat.thresholds.slice():[cd.thr];
+  let lo=Math.min(value, ...thrs), hi=Math.max(value, ...thrs);
+  if(!(hi>lo)){ hi=lo+1; lo=lo-1; }
+  const pad=(hi-lo)*0.08||1; lo-=pad; hi+=pad;
+  const W=520,H=46,padX=10,trackY=22,trackH=12, plotW=W-2*padX;
+  const X=v=> padX + ((v-lo)/(hi-lo))*plotW;
+  const onX=X(cd.thr);                  // value >= thr is the ON region (to the right)
+  const finite=Number.isFinite(value);
+  let s='<svg viewBox="0 0 '+W+' '+H+'" preserveAspectRatio="none" role="img">';
+  // base track + ON/OFF zones split at the binding threshold
+  s+='<rect class="track" x="'+padX+'" y="'+trackY+'" width="'+plotW+'" height="'+trackH+'" rx="3"/>';
+  s+='<rect class="zone-off" x="'+padX+'" y="'+trackY+'" width="'+Math.max(onX-padX,0)+'" height="'+trackH+'" rx="3"/>';
+  s+='<rect class="zone-on" x="'+onX+'" y="'+trackY+'" width="'+Math.max(padX+plotW-onX,0)+'" height="'+trackH+'" rx="3"/>';
+  // all thresholds as faint ticks; the binding one highlighted
+  thrs.forEach(t=>{ const x=X(t); const bind=Math.abs(t-cd.thr)<1e-9;
+    s+='<line class="thr'+(bind?' bind':'')+'" x1="'+x+'" y1="'+(trackY-4)+'" x2="'+x+'" y2="'+(trackY+trackH+4)+'"/>'; });
+  s+='<text class="gt" x="'+onX+'" y="'+(trackY-6)+'" text-anchor="middle">≥ '+esc(fmtNum(cd.thr))+'</text>';
+  // value needle + dot
+  if(finite){
+    const vx=Math.max(padX,Math.min(padX+plotW,X(value)));
+    const dotCls=cd.impossible?'bad':(cd.ok?'ok':'bad');
+    s+='<line class="needle" x1="'+vx+'" y1="'+(trackY-6)+'" x2="'+vx+'" y2="'+(trackY+trackH+6)+'"/>';
+    s+='<circle class="dot '+dotCls+'" cx="'+vx+'" cy="'+(trackY+trackH/2)+'" r="5"/>';
+    s+='<text class="gt" x="'+vx+'" y="'+(H-4)+'" text-anchor="middle">'+esc(fmtNum(value))+'</text>';
+  }
+  // scale ends
+  s+='<text class="gt" x="'+padX+'" y="'+(trackY-6)+'">'+esc(fmtNum(+lo.toFixed(2)))+'</text>';
+  s+='<text class="gt" x="'+(padX+plotW)+'" y="'+(trackY-6)+'" text-anchor="end">'+esc(fmtNum(+hi.toFixed(2)))+'</text>';
+  return s+'</svg>';
+}
+
+// (C) Decision-flow diagram (Sankey-ish): READINGS → RULES → CLASS VOTE → WINNER.
+// Only the firing winner/runner rules are drawn, so it stays readable.
+function flowDiagramSvg(fv, res, winIdx, runIdx, classes){
+  const winLbl=classes[winIdx], runLbl=runIdx!=null?classes[runIdx]:null;
+  const pick=(lbl,pol)=>CLAUSES.filter(c=>String(c.class)===lbl && c.polarity===pol && res.clauseOut[c.id].out>0)
+                              .map(c=>({c,out:res.clauseOut[c.id].out})).sort((a,b)=>b.out-a.out).slice(0,4);
+  const winRules=pick(winLbl,'positive');
+  const runRules=runLbl?pick(runLbl,'positive'):[];
+  const ruleSet=winRules.map(o=>({...o,cls:winIdx})).concat(runRules.map(o=>({...o,cls:runIdx})));
+  // features feeding the drawn rules (cap for readability)
+  const featOrder=[];
+  ruleSet.forEach(o=>(o.c.featureBands||[]).forEach(b=>{ if(!featOrder.includes(b.feature)) featOrder.push(b.feature); }));
+  const feats=featOrder.slice(0,8);
+  const classNodes=[{k:winIdx,lbl:winLbl}]; if(runIdx!=null&&runIdx!==winIdx) classNodes.push({k:runIdx,lbl:runLbl});
+
+  const W=720, colX=[20,250,520], nodeW=170;
+  const rowH=Math.max(feats.length, ruleSet.length||1, classNodes.length)* 1;
+  const H=Math.max(150, 30+Math.max(feats.length,ruleSet.length,classNodes.length)*40);
+  const slot=(n,i,h)=>{ const gap=(H-30)/(n+1); return 30+gap*(i+1); };
+  const cx=i=>colX[i]+nodeW/2;
+  let s='<svg class="flowdiag" viewBox="0 0 '+W+' '+H+'" preserveAspectRatio="xMidYMid meet" role="img">';
+  s+='<text class="col" x="'+(colX[0])+'" y="18">readings</text>';
+  s+='<text class="col" x="'+(colX[1])+'" y="18">rules that fired</text>';
+  s+='<text class="col" x="'+(colX[2])+'" y="18">class vote</text>';
+  // positions
+  const fy={}; feats.forEach((f,i)=>fy[f]=slot(feats.length,i));
+  const ry=ruleSet.map((o,i)=>slot(ruleSet.length,i));
+  const cy={}; classNodes.forEach((c,i)=>cy[c.k]=slot(classNodes.length,i));
+  // edges feature->rule
+  ruleSet.forEach((o,ri)=>{
+    (o.c.featureBands||[]).forEach(b=>{ if(fy[b.feature]==null) return;
+      const x1=colX[0]+nodeW, y1=fy[b.feature], x2=colX[1], y2=ry[ri];
+      const mx=(x1+x2)/2; const d='M'+x1+' '+y1+'C'+mx+' '+y1+' '+mx+' '+y2+' '+x2+' '+y2;
+      const len=Math.hypot(x2-x1,y2-y1)+Math.abs(y2-y1);
+      s+='<path class="edge feat" d="'+d+'" stroke-width="1" style="--len:'+len+'" opacity="0.5"/>';
+    });
+  });
+  // edges rule->class (width ∝ points)
+  const maxOut=Math.max(1,...ruleSet.map(o=>o.out));
+  ruleSet.forEach((o,ri)=>{
+    const x1=colX[1]+nodeW, y1=ry[ri], x2=colX[2], y2=cy[o.cls];
+    const mx=(x1+x2)/2; const d='M'+x1+' '+y1+'C'+mx+' '+y1+' '+mx+' '+y2+' '+x2+' '+y2;
+    const len=Math.hypot(x2-x1,y2-y1)+Math.abs(y2-y1);
+    s+='<path class="edge pos" d="'+d+'" stroke-width="'+(1+3*o.out/maxOut)+'" style="--len:'+len+'"/>';
+  });
+  // feature nodes
+  feats.forEach(f=>{ const y=fy[f]-15;
+    s+='<rect class="node feat" x="'+colX[0]+'" y="'+y+'" width="'+nodeW+'" height="30" rx="6"/>';
+    let nm=f; if(nm.length>18)nm=nm.slice(0,17)+'…';
+    s+='<text x="'+(colX[0]+8)+'" y="'+(fy[f]-1)+'">'+esc(nm)+'</text>';
+    s+='<text class="sub" x="'+(colX[0]+8)+'" y="'+(fy[f]+11)+'">= '+esc(fmtNum(fv[f]))+'</text>';
+  });
+  if(featOrder.length>feats.length) s+='<text class="sub" x="'+colX[0]+'" y="'+(H-6)+'">+'+(featOrder.length-feats.length)+' more readings</text>';
+  // rule nodes — show the human rule NAME (not the internal id) + its votes
+  ruleSet.forEach((o,ri)=>{ const y=ry[ri]-15;
+    s+='<rect class="node rulepos" x="'+colX[1]+'" y="'+y+'" width="'+nodeW+'" height="30" rx="6"/>';
+    let rn=clauseName(o.c); if(rn.length>24) rn=rn.slice(0,23)+'…';
+    s+='<text x="'+(colX[1]+8)+'" y="'+(ry[ri]-1)+'">'+esc(rn)+'</text>';
+    s+='<text class="sub" x="'+(colX[1]+8)+'" y="'+(ry[ri]+11)+'">+'+o.out+' votes → '+esc(classes[o.cls].slice(0,12))+'</text>';
+  });
+  if(!ruleSet.length) s+='<text class="sub" x="'+colX[1]+'" y="'+(H/2)+'">no positive rule fired</text>';
+  // class nodes
+  classNodes.forEach(c=>{ const y=cy[c.k]-17, win=c.k===winIdx;
+    s+='<rect class="node cls'+(win?' win':'')+'" x="'+colX[2]+'" y="'+y+'" width="'+nodeW+'" height="34" rx="6"/>';
+    let nm=c.lbl; if(nm.length>16)nm=nm.slice(0,15)+'…';
+    s+='<text x="'+(colX[2]+8)+'" y="'+(cy[c.k]-1)+'">'+(win?'★ ':'')+esc(nm)+'</text>';
+    s+='<text class="sub" x="'+(colX[2]+8)+'" y="'+(cy[c.k]+12)+'">total '+fmtNum(res.scores[c.k])+(win?' — winner':'')+'</text>';
+  });
+  return s+'</svg>';
+}
+
+function showSample(i){
+  const r=PRED.rows[i]; if(!r||!ENGINE) return;
+  const fv=rowFeatureValues(r);
+  const res=evalSample(ENGINE, fv);
+  const classes=ENGINE.classes, scores=res.scores;
+  const winIdx=res.predIdx, winLbl=res.predLabel;
+  // ranking
+  const ranked=scores.map((v,k)=>({k,v})).sort((a,b)=>b.v-a.v);
+  const runner = ranked.find(o=>o.k!==winIdx) || ranked[1] || {k:winIdx,v:scores[winIdx]};
+  const margin = scores[winIdx]-runner.v;
+  const ai=COMP?COMP.ai:-1;
+  const hasActual = ai>=0 && r[ai]!=='';
+  const truth = hasActual?classLabel(r[ai]):null;
+  const ok = hasActual?(truth===winLbl):null;
+
+  // ---- outcome banner ----
+  let html='';
+  const oc = ok===null?'':(ok?'ok':'miss');
+  html+='<div class="outcome '+oc+'">';
+  html+='<div class="muted" style="font-size:12px">Sample #'+i+' — the model classified this as</div>';
+  html+='<div class="big">'+esc(winLbl)+'</div>';
+  if(hasActual) html+='<div style="margin-top:4px">'+(ok?'<span class="badge pos">✓ correct</span>':'<span class="badge neg">✗ wrong</span> &nbsp;the true label is <b>'+esc(truth)+'</b>')+'</div>';
+  const confTxt = margin>0 ? ('won by <b>'+fmtNum(margin)+'</b> points over '+esc(classes[runner.k])) : 'a very close call (tie or near-tie) with '+esc(classes[runner.k]);
+  html+='<div class="muted" style="margin-top:6px;font-size:12px">'+confTxt+'</div>';
+  html+='</div>';
+
+  const winPos = ENGINE.clauses.filter(c=>c.clsIdx===winIdx && c.polarity==='positive' && res.clauseOut[c.id].out>0);
+  const winPosFull = CLAUSES.filter(c=>winPos.some(w=>w.id===c.id));
+
+  // ---- STEP 1: the decision-flow diagram (readings → rules → class vote) ----
+  html+='<div class="step"><div class="num">1</div><h3>How the decision flowed</h3>';
+  html+='<div class="muted" style="font-size:12px;margin-bottom:4px">trace it left → right: the readings feed the rules that fired, each rule adds points to a class, the highest total wins.</div>';
+  html+=flowDiagramSvg(fv, res, winIdx, runner.k!==winIdx?runner.k:null, classes);
+  html+='<div class="leg"><span><i style="background:#3a4a6a"></i> reading → rule</span><span><i style="background:var(--pos)"></i> rule → class (thicker = more points)</span><span><i style="background:#1a2417;border:1px solid var(--pos)"></i> winning class</span></div>';
+  html+='</div>';
+
+  // ---- STEP 2: rules that fired, as a labelled vote-bar list ----
+  const allFired = ENGINE.clauses.filter(c=>res.clauseOut[c.id].out>0)
+    .map(c=>({c:CLAUSES.find(x=>x.id===c.id)||c, out:res.clauseOut[c.id].out, sign:c.sign}))
+    .sort((a,b)=>b.out-a.out);
+  const firedWin = allFired.filter(o=>String(o.c.class)===winLbl);
+  const FR_TOP=8;
+  html+='<div class="step"><div class="num">2</div><h3>Which rules fired ('+allFired.length+')</h3>';
+  html+='<div class="muted" style="font-size:12px;margin-bottom:2px">'+allFired.length+' rules matched this sample; '+firedWin.length+' of them belong to the winning class <b>'+esc(winLbl)+'</b>. Bar length = votes; green adds to its class, red subtracts.</div>';
+  html+='<div id="firedRules">'+firedRulesHtml(firedWin.slice(0,FR_TOP), winLbl, classes)+'</div>';
+  if(firedWin.length>FR_TOP) html+='<button class="linklike" id="moreFiredWin">show all '+firedWin.length+' winning-class rules…</button>';
+  html+='<details style="margin-top:6px"><summary>'+allFired.length+' fired rules across all classes</summary><div style="margin-top:6px" id="firedAll">'+firedRulesHtml(allFired.slice(0,40), winLbl, classes)+(allFired.length>40?'<div class="muted" style="font-size:11px">showing 40 of '+allFired.length+'</div>':'')+'</div></details>';
+  html+='</div>';
+
+  // ---- STEP 3: the readings, as feature chips ----
+  const keyFeats=new Set();
+  winPosFull.forEach(c=>(c.featureBands||[]).forEach(b=>keyFeats.add(b.feature)));
+  const keyList=[...keyFeats];
+  html+='<div class="step"><div class="num">3</div><h3>What the sensors showed</h3>';
+  if(keyList.length){
+    html+='<div class="muted" style="font-size:12px;margin-bottom:4px">readings the deciding rules looked at:</div>';
+    html+='<div>'+keyList.slice(0,16).map(f=>'<span class="feat-key">'+esc(f)+' <span class="fv">'+esc(fmtNum(fv[f]))+'</span></span>').join('')+'</div>';
+  }
+  const allFeatChips=PRED.featCols.map(fc=>'<span class="feat-key">'+esc(fc.name)+' <span class="fv">'+esc(fmtNum(r[fc.col]))+'</span></span>').join('');
+  html+='<details style="margin-top:6px"><summary>all '+PRED.featCols.length+' readings</summary><div style="margin-top:6px">'+allFeatChips+'</div></details></div>';
+
+  // ---- STEP 3: how the classes scored (SVG diverging vote chart) ----
+  const showN=Math.min(TOP_CLASSES, ranked.length);
+  html+='<div class="step"><div class="num">4</div><h3>How each class scored</h3>';
+  html+='<div class="muted" style="font-size:12px;margin-bottom:4px">each rule that matches adds points for its class (right, green) or takes them away (left, red); the highest total wins.</div>';
+  html+='<div id="scoreBars">'+voteChartSvg(ranked.slice(0,showN), classes, winIdx, runner.k)+'</div>';
+  if(ranked.length>showN) html+='<button class="linklike" id="moreScores">show all '+ranked.length+' classes…</button>';
+  html+='</div>';
+
+  // ---- why the winner ----
+  const winCards = winPosFull.map(c=>({c,out:res.clauseOut[c.id].out})).sort((a,b)=>b.out-a.out);
+  html+='<div class="step"><div class="num">5</div><h3>Why “'+esc(winLbl)+'” — the rules in detail</h3>';
+  if(winCards.length){
+    html+='<div class="muted" style="font-size:12px;margin-bottom:6px">'+winCards.length+' supporting rule'+(winCards.length===1?'':'s')+' matched this sample. The strongest:</div>';
+    html+='<div class="muted" style="font-size:11px;margin-bottom:4px">the strongest rule shows a gauge per reading: ▮ dot = your value, shaded zone = where the “≥ threshold” bit turns ON.</div>';
+    html+='<div id="winRules">'+winCards.slice(0,TOP_RULES).map((o,idx)=>ruleCard(o.c,fv,o.out,true,idx===0)).join('')+'</div>';
+    if(winCards.length>TOP_RULES) html+='<button class="linklike" id="moreWin">show '+(winCards.length-TOP_RULES)+' more supporting rules…</button>';
+  } else {
+    html+='<div class="muted">No supporting rule matched strongly; this class won mainly because the others scored lower.</div>';
+  }
+  // objections against the winner (negative clauses of winner that fired)
+  const winNeg = CLAUSES.filter(c=>String(c.class)===winLbl && c.polarity==='negative' && res.clauseOut[c.id].out>0)
+                        .map(c=>({c,out:res.clauseOut[c.id].out})).sort((a,b)=>b.out-a.out);
+  if(winNeg.length){
+    html+='<details style="margin-top:8px"><summary>'+winNeg.length+' rule'+(winNeg.length===1?'':'s')+' pushed against “'+esc(winLbl)+'” (it still won)</summary><div style="margin-top:6px">'+
+      winNeg.slice(0,TOP_RULES).map(o=>ruleCard(o.c,fv,o.out,false)).join('')+'</div></details>';
+  }
+  html+='</div>';
+
+  // ---- why not the runner-up ----
+  if(runner.k!==winIdx){
+    const runLbl=classes[runner.k];
+    const runPos=CLAUSES.filter(c=>String(c.class)===runLbl && c.polarity==='positive' && res.clauseOut[c.id].out>0)
+                        .map(c=>({c,out:res.clauseOut[c.id].out})).sort((a,b)=>b.out-a.out);
+    const runNeg=CLAUSES.filter(c=>String(c.class)===runLbl && c.polarity==='negative' && res.clauseOut[c.id].out>0)
+                        .map(c=>({c,out:res.clauseOut[c.id].out})).sort((a,b)=>b.out-a.out);
+    const runPosPts=runPos.reduce((a,o)=>a+o.out,0), runNegPts=runNeg.reduce((a,o)=>a+o.out,0);
+    html+='<div class="step"><div class="num">6</div><h3>Why not “'+esc(runLbl)+'”</h3>';
+    // Always show a clear, non-empty explanation — even when no positive rule fired.
+    html+='<div class="muted" style="font-size:12px;margin-bottom:6px"><b>'+esc(winLbl)+'</b> scored <b>'+fmtNum(scores[winIdx])+'</b>, '+
+      esc(runLbl)+' scored <b>'+fmtNum(runner.v)+'</b> — a gap of '+fmtNum(scores[winIdx]-runner.v)+'.</div>';
+    if(!runPos.length){
+      html+='<div class="rule"><div class="muted" style="font-size:12px">'+
+        'No supporting rule for <b>'+esc(runLbl)+'</b> matched this sample'+
+        (runNeg.length?(', and '+runNeg.length+' rule'+(runNeg.length===1?'':'s')+' actively argued against it (−'+runNegPts+' points)'):'')+
+        '. With '+(runPos.length? '':'no points for and ')+(runNeg.length?('−'+runNegPts):'0')+' against, it could not catch '+esc(winLbl)+'.'+
+        '</div></div>';
+    } else {
+      html+='<div class="muted" style="font-size:12px;margin-bottom:4px">'+esc(runLbl)+' did get +'+runPosPts+' from '+runPos.length+' supporting rule'+(runPos.length===1?'':'s')+
+        (runNeg.length?(' but −'+runNegPts+' from '+runNeg.length+' opposing rule'+(runNeg.length===1?'':'s')):'')+' — still short. Its strongest supporters:</div>';
+      html+='<div>'+runPos.slice(0,TOP_RULES).map(o=>ruleCard(o.c,fv,o.out,true)).join('')+'</div>';
+      if(runPos.length>TOP_RULES) html+='<div class="muted" style="font-size:11px">+'+(runPos.length-TOP_RULES)+' more supporting rules</div>';
+    }
+    html+='</div>';
+  }
+
+  const replay = ANIMATE ? ' <button class="linklike" id="replayFlow" title="play the flow again">▶ replay</button>' : '';
+  $('#predDetail').classList.toggle('flow', ANIMATE);
+  $('#predDetail').innerHTML='<h2>Decision path'+replay+'</h2>'+html;
+  // wire progressive-disclosure buttons
+  if($('#moreFiredWin')) $('#moreFiredWin').onclick=()=>{ $('#firedRules').innerHTML=firedRulesHtml(firedWin, winLbl, classes); $('#moreFiredWin').remove(); };
+  if($('#moreScores')) $('#moreScores').onclick=()=>{ $('#scoreBars').innerHTML=voteChartSvg(ranked, classes, winIdx, runner.k); $('#moreScores').remove(); };
+  if($('#moreWin')) $('#moreWin').onclick=()=>{ $('#winRules').innerHTML=winCards.map(o=>ruleCard(o.c,fv,o.out,true)).join(''); $('#moreWin').remove(); };
+  if($('#replayFlow')) $('#replayFlow').onclick=()=>showSample(i);
+  animateFlow();
+}
+
+// Stagger the decision-path elements so the explanation plays as a flow:
+// outcome → inputs → score bars filling → matched rules → each condition.
+function animateFlow(){
+  if(!ANIMATE) return;
+  const els=$$('#predDetail .outcome, #predDetail .step h3, #predDetail .bar, #predDetail .rule, #predDetail .cond');
+  els.forEach((el,i)=>{ el.classList.add('anim'); el.style.animationDelay=Math.min(i*22, 1600)+'ms'; });
+}
+
+let predSearchTimer=null;
+$('#predSearch').addEventListener('input',()=>{ clearTimeout(predSearchTimer); predSearchTimer=setTimeout(()=>{predState.page=0;renderPred();},150); });
+$('#predErrOnly').addEventListener('change',()=>{predState.page=0;renderPred();});
+$('#colToggle').addEventListener('change',e=>{ predState.allCols=e.target.checked; if(PRED){ buildPredHeader(); renderPred(); } });
+$('#techToggle').addEventListener('change',e=>document.body.classList.toggle('tech-on', e.target.checked));
+// honour the OS "reduce motion" setting; let the user toggle the flow animation
+try{ if(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches){ ANIMATE=false; $('#animToggle').checked=false; } }catch(e){}
+$('#animToggle').addEventListener('change',e=>{ ANIMATE=e.target.checked; if(predState.sel>=0 && PRED) showSample(predState.sel); });
+</script>
+</body>
+</html>

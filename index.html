@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>TsetlinLab — interpretable Tsetlin Machines in the browser</title>
+<style>
+  :root{--bg:#0f1117;--panel:#181b24;--panel2:#1f2431;--line:#2b3142;--fg:#e6e8ee;--mut:#9aa3b2;--acc:#7aa2f7;--pos:#9ece6a;--neg:#f7768e;--warn:#e0af68}
+  *{box-sizing:border-box} body{margin:0;font:15px/1.55 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;background:var(--bg);color:var(--fg)}
+  header{padding:30px 24px 22px;border-bottom:1px solid var(--line);background:linear-gradient(180deg,#141824,#0f1117)}
+  header h1{margin:0;font-size:26px;letter-spacing:-.4px} header h1 .g{color:var(--acc)}
+  header p{margin:8px 0 0;color:var(--mut);max-width:760px}
+  .pills{margin-top:14px;display:flex;gap:8px;flex-wrap:wrap}
+  .pill{font-size:12px;border:1px solid var(--line);background:var(--panel2);border-radius:999px;padding:3px 11px;color:var(--mut)}
+  main{max-width:1080px;margin:0 auto;padding:24px}
+  h2{font-size:13px;text-transform:uppercase;letter-spacing:.06em;color:var(--mut);margin:30px 0 12px}
+  .feat{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:14px}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:16px 18px}
+  .card h3{margin:0 0 6px;font-size:15px} .card p{margin:0;color:var(--mut);font-size:13.5px}
+  .card .ic{font-size:20px;margin-bottom:6px}
+  table.mx{width:100%;border-collapse:separate;border-spacing:8px}
+  table.mx th{font-size:13px;color:var(--mut);font-weight:600;text-align:left;padding:6px 8px}
+  table.mx thead th{text-align:center;font-size:12px;text-transform:uppercase;letter-spacing:.04em}
+  table.mx td{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:12px 14px;text-align:center;min-width:150px;vertical-align:top}
+  table.mx td.win{border-color:#33502a;background:#16241a}
+  table.mx td .acc{font-size:21px;font-weight:800} table.mx td.win .acc{color:var(--pos)}
+  table.mx td .sub{font-size:11.5px;color:var(--mut);margin-top:2px}
+  table.mx td .vr{display:inline-block;margin-top:8px;font-size:12px;color:var(--acc);text-decoration:none;border:1px solid var(--line);border-radius:7px;padding:4px 9px}
+  table.mx td .vr:hover{border-color:var(--acc)}
+  table.mx tbody th{font-size:14px;color:var(--fg)}
+  .note{color:var(--mut);font-size:13px;line-height:1.7;background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:14px 16px}
+  .legend{display:flex;gap:8px;flex-wrap:wrap;margin:10px 0 0;font-size:12px;color:var(--mut)}
+  .colhdr .b{display:block;color:var(--fg);font-weight:700} .colhdr .s{font-size:11px;color:var(--mut)}
+  a{color:var(--acc)} code{font-family:ui-monospace,Menlo,Consolas,monospace;background:var(--panel2);padding:1px 5px;border-radius:4px;font-size:12.5px}
+  footer{color:var(--mut);font-size:12px;text-align:center;padding:30px}
+  .cta{display:inline-block;margin-top:8px;background:#16241a;border:1px solid #33502a;color:var(--pos);border-radius:8px;padding:8px 14px;text-decoration:none;font-size:14px}
+</style></head><body>
+<header>
+  <h1><span class="g">Tsetlin</span>Lab</h1>
+  <p>An interactive, in-browser lab for <b>interpretable Tsetlin Machines</b>. View every rule in plain language, trace any sample end-to-end (inputs → bits → clauses fired → class vote → decision), and compare binarisers and engines side by side. Inference runs fully client-side in WebAssembly — no server, no install.</p>
+  <div class="pills"><span class="pill">WebAssembly inference</span><span class="pill">rule-level interpretability</span><span class="pill">4 IoT/security datasets</span><span class="pill">binariser × engine comparison</span><span class="pill">zero backend</span></div>
+</header>
+<main>
+  <h2>What you can do</h2>
+  <div class="feat">
+    <div class="card"><div class="ic">🔎</div><h3>See every rule</h3><p>Each clause shown in plain language — which features must be high or low, the thresholds, and the votes it casts for or against a class.</p></div>
+    <div class="card"><div class="ic">🧭</div><h3>Trace any sample</h3><p>Click a sample for a fully-visual decision path: readings → bits → which clauses fired → per-class vote → final prediction.</p></div>
+    <div class="card"><div class="ic">🌡️</div><h3>Inspect the booleaniser</h3><p>Watch one feature become thermometer bits and literals, live, on the Encoding tab — the GLADE binarisation made explicit.</p></div>
+    <div class="card"><div class="ic">⚙️</div><h3>Runs in your browser</h3><p>The model is recomputed client-side in WebAssembly, bit-exact to the trained model. Open the page and it just works.</p></div>
+  </div>
+
+  <h2>Model comparison — accuracy / macro-F1 / binariser bits</h2>
+  <table class="mx">
+    <thead><tr><th></th>
+      <th class="colhdr"><span class="b">GLADE + FPTM</span><span class="s">gap-aware binariser + Fuzzy-Pattern TM</span></th>
+      <th class="colhdr"><span class="b">GLADE + TMU</span><span class="s">GLADE bits + vanilla TM engine</span></th>
+      <th class="colhdr"><span class="b">TMU + TMU</span><span class="s">standard binariser + vanilla TM</span></th>
+    </tr></thead>
+    <tbody>
+    <tr><th>WUSTL-EHMS-2020</th><td class="win"><div class="acc">94.24%</div><div class="sub">F1 0.774 · 256 bits</div><a class="vr" href="viewer.html?src=data/wustl_atlas.json&csv=data/wustl_predictions.csv">view rules →</a></td><td class=""><div class="acc">92.43%</div><div class="sub">F1 0.727 · 256 bits</div><a class="vr" href="viewer.html?src=data/gladetmu_wustl_atlas.json&csv=data/gladetmu_wustl_predictions.csv">view rules →</a></td><td class=""><div class="acc">92.86%</div><div class="sub">F1 0.76 · 313 bits</div><a class="vr" href="viewer.html?src=data/tmu_wustl_atlas.json&csv=data/tmu_wustl_predictions.csv">view rules →</a></td></tr>
+<tr><th>NSL-KDD</th><td class="win"><div class="acc">99.51%</div><div class="sub">F1 0.936 · 253 bits</div><a class="vr" href="viewer.html?src=data/nslkdd_atlas.json&csv=data/nslkdd_predictions.csv">view rules →</a></td><td class=""><div class="acc">99.41%</div><div class="sub">F1 0.927 · 253 bits</div><a class="vr" href="viewer.html?src=data/gladetmu_nslkdd_atlas.json&csv=data/gladetmu_nslkdd_predictions.csv">view rules →</a></td><td class=""><div class="acc">99.32%</div><div class="sub">F1 0.917 · 472 bits</div><a class="vr" href="viewer.html?src=data/tmu_nslkdd_atlas.json&csv=data/tmu_nslkdd_predictions.csv">view rules →</a></td></tr>
+<tr><th>TON_IoT</th><td class="win"><div class="acc">97.08%</div><div class="sub">F1 0.941 · 122 bits</div><a class="vr" href="viewer.html?src=data/ton_iot_atlas.json&csv=data/ton_iot_predictions.csv">view rules →</a></td><td class=""><div class="acc">96.61%</div><div class="sub">F1 0.935 · 122 bits</div><a class="vr" href="viewer.html?src=data/gladetmu_ton_iot_atlas.json&csv=data/gladetmu_ton_iot_predictions.csv">view rules →</a></td><td class=""><div class="acc">83.03%</div><div class="sub">F1 0.769 · 186 bits</div><a class="vr" href="viewer.html?src=data/tmu_ton_iot_atlas.json&csv=data/tmu_ton_iot_predictions.csv">view rules →</a></td></tr>
+<tr><th>MedSec-25</th><td class="win"><div class="acc">97.06%</div><div class="sub">F1 0.87 · 351 bits</div><a class="vr" href="viewer.html?src=data/medsec_atlas.json&csv=data/medsec_predictions.csv">view rules →</a></td><td class=""><div class="acc">96.77%</div><div class="sub">F1 0.858 · 351 bits</div><a class="vr" href="viewer.html?src=data/gladetmu_medsec_atlas.json&csv=data/gladetmu_medsec_predictions.csv">view rules →</a></td><td class=""><div class="acc">87.38%</div><div class="sub">F1 0.685 · 698 bits</div><a class="vr" href="viewer.html?src=data/tmu_medsec_atlas.json&csv=data/tmu_medsec_predictions.csv">view rules →</a></td></tr>
+
+    </tbody>
+  </table>
+  <div class="note">Same train/test split per dataset; per-dataset config matched across engines. <b>The binariser is decisive on hard datasets</b>: holding the engine fixed, GLADE bits lift TON_IoT from 83.0% → 96.6% and MedSec from 87.4% → 96.8% — with fewer bits. Click any cell's <b>view rules</b> to open that exact model and inspect its clauses, encoding and per-sample decision paths.</div>
+
+  <h2>Open the viewer directly</h2>
+  <p><a class="cta" href="viewer.html?src=data/wustl_atlas.json&csv=data/wustl_predictions.csv">Launch TsetlinLab viewer →</a></p>
+  <p style="color:var(--mut);font-size:13px;margin-top:10px">Or load any model: append <code>?src=data/&lt;name&gt;_atlas.json&amp;csv=data/&lt;name&gt;_predictions.csv</code> to <code>viewer.html</code>.</p>
+</main>
+<footer>TsetlinLab · interpretable Tsetlin Machines for IoT intrusion detection</footer>
+</body></html>
