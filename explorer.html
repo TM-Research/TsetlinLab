@@ -119,8 +119,14 @@ select,input[type=search]{background:var(--p2);border:1px solid var(--line);colo
 .rule{font-size:13.5px;line-height:1.9;font-family:ui-monospace,Menlo,monospace;background:var(--p2);border:1px solid var(--line);border-radius:10px;padding:13px 15px}
 .rule .kw{color:var(--warn);font-weight:700}.rule .feat{color:var(--acc)}.rule .cls{font-weight:700}.rule .and{color:var(--mut)}
 .condlist{margin-top:13px;display:flex;flex-direction:column;gap:5px}
-.condrow{display:flex;align-items:center;gap:9px;font-size:12px}.condrow .mk{width:16px;text-align:center;font-weight:800}
-.condrow.sat .mk{color:var(--on)} .condrow.unsat .mk{color:var(--neg)}
+.condrow{display:flex;align-items:center;gap:9px;font-size:12.5px;padding:3px 0;border-bottom:1px solid #1d2230}
+.condrow .mk{width:16px;text-align:center;font-weight:800} .condrow .cd{font-family:ui-monospace,monospace;font-weight:600}
+.condrow.sat .mk{color:var(--on)} .condrow.unsat .mk{color:var(--neg)} .condrow.unsat{opacity:.72}
+.ruleverdict{display:flex;align-items:center;gap:14px;background:var(--p2);border:1px solid var(--line);border-radius:10px;padding:11px 14px;margin-bottom:6px}
+.ruleverdict.on{border-color:#2a5a3c}
+.rv-big{font-size:18px;font-weight:800} .rv-sub{font-size:11px;color:var(--mut)} .rv-left{min-width:120px}
+.metmeter{flex:1;height:10px;background:var(--p1);border:1px solid var(--line);border-radius:5px;overflow:hidden}
+.metfill{height:100%;background:linear-gradient(90deg,var(--warn),var(--on));transition:width .5s}
 .mc-close{margin-top:14px;text-align:right}
 .loading{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:14px;background:var(--bg);z-index:100}
 .spin{width:44px;height:44px;border:4px solid var(--line);border-top-color:var(--acc);border-radius:50%;animation:spin 1s linear infinite}
@@ -163,15 +169,15 @@ select,input[type=search]{background:var(--p2);border:1px solid var(--line);colo
 
 <div class="stage" id="stage">
   <div class="step" data-step="0" id="s0"><h2>Top-level pipeline</h2><div class="cap" id="cap0"></div><div class="pipe" id="pipe"></div><div class="ovbig" id="ovbig"></div></div>
-  <div class="step" data-step="1" id="s1"><h2>① Input → Booleanizer</h2><div class="cap">Each raw reading is compared to its GLADE thresholds → bits. Click a feature to spotlight the rules that use it.</div><div class="fgrid" id="fgrid"></div></div>
-  <div class="step" data-step="2" id="s2"><h2>② Literal panorama (256 literals)</h2><div class="cap">Every literal as a tile — green = TRUE for this sample. Tiles ringed white are used by a clause that fired. Click one to see its rules.</div><div class="litpan" id="litpan"></div><div class="lp-info" id="lpinfo"></div></div>
+  <div class="step" data-step="1" id="s1"><h2>① Input → Booleanizer</h2><div class="cap">your readings → bits · <span style="color:var(--acc)">click a feature</span> to see its rules</div><div class="fgrid" id="fgrid"></div></div>
+  <div class="step" data-step="2" id="s2"><h2>② Literal panorama (256 literals)</h2><div class="cap"><span style="color:var(--on)">green = true</span> · white ring = used by a fired rule · click a tile</div><div class="litpan" id="litpan"></div><div class="lp-info" id="lpinfo"></div></div>
   <div class="step" data-step="3" id="s3"><h2>③ Literals → Clauses</h2>
     <div class="clausetools">
       <div class="filt" id="clFilt"></div>
       <input type="search" id="clSearch" placeholder="feature in rule…" style="width:170px">
       <span class="kbd" id="clCount"></span></div>
     <div class="clist" id="clist"></div></div>
-  <div class="step" data-step="4" id="s4"><h2>④ Clauses → Class decision</h2><div class="cap">Each fired clause adds its vote (＋ supports / − opposes) to its class. Highest total wins.</div>
+  <div class="step" data-step="4" id="s4"><h2>④ Clauses → Class decision</h2><div class="cap">votes add up per class · highest wins</div>
     <div class="votes" id="votes"></div><div class="winner" id="winner"></div><div class="vexplain" id="vexplain"></div></div>
 </div>
 
@@ -239,7 +245,7 @@ function initStatic(){
     +CLASSES.map((c,i)=>`<span class="chipbtn" data-f="cls:${i}" style="border-color:${clr(i)}">${c}</span>`).join('');
   $$('#filt .chipbtn').forEach(b=>b.onclick=()=>{FILTER=b.dataset.f;$$('#filt .chipbtn').forEach(x=>x.classList.toggle('on',x===b));renderStrip();});
   renderStrip(); renderTimeline();
-  $('#cap0').textContent=`Sample flows through the real ${CURMODEL} model. Click any stage to drill in →`;
+  $('#cap0').textContent=`click any stage to open it →`;
 }
 let STEPS=['Overview','Booleanize','Literals','Clauses','Class'];
 function renderTimeline(){
@@ -382,18 +388,15 @@ function drawClauses(){
   $('#clCount').textContent=`${list.length} rules${list.length>cap?' (showing '+cap+')':''} · ${nFired()} fired total`;
   $('#clist').innerHTML=list.slice(0,cap).map((o,i)=>{
     const c=o.c,ci=ENGINE.idx[c.class],col=clr(ci),fired=o.out>0;
-    const bands=(c.featureBands||[]).slice(0,6).map(b=>{
-      // is this band satisfied? recompute from its literals
-      const lits=(c.literals||[]).filter(l=>l.feature===b.feature);
-      const sat=lits.every(l=>{const x=FV[l.feature];return l.operator==='≥'?(x>=l.threshold):(x<l.threshold);});
-      return `<span class="lchip ${sat?'sat':'unsat'}">${esc(b.plain||b.text||b.feature)}</span>`;
-    }).join('')+((c.featureBands||[]).length>6?`<span class="lchip">+${c.featureBands.length-6}</span>`:'');
+    const allb=c.featureBands||[];
+    const bands=allb.slice(0,5).map(b=>{const sat=bandSat(c,b);
+      return `<span class="lchip ${sat?'sat':'unsat'}">${sat?'✓':'✗'} ${shortCond(c,b)}</span>`;
+    }).join('')+(allb.length>5?`<span class="lchip">+${allb.length-5}</span>`:'');
     return `<div class="clause ${fired?'fired':''}" data-cid="${c.id}" style="border-left-color:${col};animation-delay:${Math.min(i*20,600)}ms">
       <div class="chead"><span style="color:${col}">Rule ${c.id}</span>
-        <span style="color:var(--mut);font-weight:400;font-size:10px">${c.polarity==='positive'?'＋ supports':'− opposes'} ${c.class}</span>
-        <span class="fire ${fired?'y':'n'}">${fired?'FIRES +'+o.out:'0'}</span></div>
-      <div class="lchips">${bands}</div>
-      <div class="exhint">${c.nFeatures} features · click for full rule & per-condition check</div></div>`;
+        <span style="color:var(--mut);font-weight:400;font-size:10px">${c.polarity==='positive'?'＋':'−'} ${c.class}</span>
+        <span class="fire ${fired?'y':'n'}">${fired?'+'+o.out:'0'}</span></div>
+      <div class="lchips">${bands}</div></div>`;
   }).join('')||'<div class="lp-info">no rules match</div>';
   $$('#clist .clause').forEach(el=>el.onclick=()=>showRule(+el.dataset.cid));
 }
@@ -417,21 +420,44 @@ function votes(){
 
 /* ---- modal: full rule + per-condition ---- */
 function esc(s){return String(s).replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));}
+// SHORT, symbolic condition for a feature-band — no prose. e.g. "DIA < 75.5" or "DIA ≥ 75.5".
+// Uses the clause's own literals so the operator is exact; collapses a feature's
+// literals to a single readable bound.
+function shortCond(c,b){
+  const lits=(c.literals||[]).filter(l=>l.feature===b.feature);
+  const ge=lits.filter(l=>l.operator==='≥').map(l=>l.threshold);
+  const lt=lits.filter(l=>l.operator!=='≥').map(l=>l.threshold);
+  const lo=ge.length?Math.max(...ge):null, hi=lt.length?Math.min(...lt):null;
+  if(lo!=null&&hi!=null) return `${fmt(lo)} ≤ ${esc(b.feature)} < ${fmt(hi)}`;
+  if(lo!=null) return `${esc(b.feature)} ≥ ${fmt(lo)}`;
+  if(hi!=null) return `${esc(b.feature)} < ${fmt(hi)}`;
+  return esc(b.feature);
+}
+function bandSat(c,b){
+  const lits=(c.literals||[]).filter(l=>l.feature===b.feature);
+  return lits.every(l=>{const x=FV[l.feature];return l.operator==='≥'?(x>=l.threshold):(x<l.threshold);});
+}
 function showRule(cid){
   const ci=CLAUSES.findIndex(c=>c.id===cid),c=CLAUSES[ci];if(!c)return;
   const col=clr(ENGINE.idx[c.class]),fired=R.out[ci]>0;
-  const conds=(c.featureBands||[]).map(b=>{
-    const lits=(c.literals||[]).filter(l=>l.feature===b.feature);
-    const sat=lits.every(l=>{const x=FV[l.feature];return l.operator==='≥'?(x>=l.threshold):(x<l.threshold);});
-    return {b,sat};
-  });
-  const ruleHtml=`<span class="kw">IF</span> `+conds.map(o=>`<span class="feat">${esc(o.b.plain||o.b.text)}</span>`).join(' <span class="and">AND</span> ')+
-    ` <span class="kw">THEN</span> ${c.polarity==='positive'?'<span class="cls" style="color:'+col+'">vote FOR</span>':'<span class="cls" style="color:var(--neg)">vote AGAINST</span>'} <span class="cls" style="color:${col}">${c.class}</span>`;
-  const rows=conds.map(o=>`<div class="condrow ${o.sat?'sat':'unsat'}"><span class="mk">${o.sat?'✓':'✗'}</span><span><b>${esc(o.b.plain||o.b.text)}</b></span><span style="margin-left:auto;color:var(--mut)">${o.sat?'holds':'fails'}</span></div>`).join('');
-  openModal(`Rule ${c.id} — ${c.polarity==='positive'?'supports':'opposes'} ${c.class}`,
-    `${c.nFeatures} features · ${(c.literals||[]).length} literals (automata in Include state) · tolerance ${c.clamp}`,
-    `<div class="rule">${ruleHtml}</div><div class="condlist">${rows}</div>
-     <div class="mc-sub" style="margin-top:13px">${fired?'<b style="color:var(--on)">FIRES (+'+R.out[ci]+')</b> — close enough; this rule tolerates a few misses.':'<b style="color:var(--mut)">silent (0)</b> — too many conditions fail.'} for sample #${SI}.</div>`);
+  const conds=(c.featureBands||[]).map(b=>({b,sat:bandSat(c,b)})).sort((a,b)=>(b.sat?1:0)-(a.sat?1:0));
+  const met=conds.filter(o=>o.sat).length;
+  // compact, visual condition rows — short symbolic condition + your value + ✓/✗. No IF-wall.
+  const rows=conds.map(o=>{
+    const x=FV[o.b.feature];
+    return `<div class="condrow ${o.sat?'sat':'unsat'}"><span class="mk">${o.sat?'✓':'✗'}</span>
+      <span class="cd">${shortCond(c,o.b)}</span>
+      <span style="margin-left:auto;color:var(--mut)">${esc(o.b.feature)} = <b style="color:${o.sat?'var(--on)':'var(--neg)'}">${fmt(x)}</b></span></div>`;
+  }).join('');
+  // little met/total meter instead of a sentence
+  const meter=`<div class="metmeter"><div class="metfill" style="width:${met/conds.length*100}%"></div></div>`;
+  openModal(`Rule ${c.id}`,
+    `<span style="color:${c.polarity==='positive'?col:'var(--neg)'}">${c.polarity==='positive'?'▲ supports':'▼ opposes'}</span> <span style="color:${col}">${c.class}</span>`,
+    `<div class="ruleverdict ${fired?'on':''}">
+        <div class="rv-left"><div class="rv-big" style="color:${fired?'var(--on)':'var(--mut)'}">${fired?'FIRES +'+R.out[ci]:'silent · 0'}</div>
+        <div class="rv-sub">${met} of ${conds.length} conditions met</div></div>
+        ${meter}</div>
+     <div class="condlist">${rows}</div>`);
 }
 function openModal(title,sub,body){
   $('#mcard').innerHTML=`<h3>${title}</h3><div class="mc-sub">${sub}</div>${body}<div class="mc-close"><button class="btn" onclick="document.getElementById('modal').classList.remove('show')">Close ✕</button></div>`;
