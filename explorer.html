@@ -103,6 +103,11 @@ select,input[type=search]{background:var(--p2);border:1px solid var(--line);colo
 /* class votes (step4) */
 .votes{display:flex;flex-direction:column;gap:14px;max-width:620px;margin:8px auto 0}
 .vrow{display:grid;grid-template-columns:130px 1fr 64px;gap:12px;align-items:center}
+.vsub{font-size:10px;color:var(--mut);font-weight:400}
+.vmid{display:flex;flex-direction:column;gap:5px}
+.varith{font-family:ui-monospace,monospace;font-size:12px}
+.ar{font-weight:700} .ar.up{color:var(--on)} .ar.mut{color:var(--mut)} .ar.tot{font-weight:800}
+.contribbar{display:none}
 .vn{font-weight:700;text-align:right} .vrow.win .vn{color:var(--on)}
 .vtrack{height:30px;background:var(--p1);border:1px solid var(--line);border-radius:7px;position:relative;overflow:hidden}
 .vzero{position:absolute;top:0;bottom:0;left:50%;width:1px;background:var(--mut)}
@@ -190,8 +195,11 @@ const NS="http://www.w3.org/2000/svg";
 const CCLR=['#46d39a','#ff6b8b','#ffce6b','#b06bff','#46d3c0','#ff944d','#9aa7ff','#ff6bd6','#7bd35a','#d3c246'];
 const clr=i=>CCLR[i%CCLR.length];
 const fmt=v=>{ if(v==null||v==='')return''; const n=+v; if(!isFinite(n))return v; return Number.isInteger(n)?n:(+n.toPrecision(4)); };
-const BASE="https://rakesh2109.github.io/TsetlinLab/data/";
-const MODELS=[["wustl","WUSTL · GLADE+FPTM"],["gladetmu_wustl","WUSTL · GLADE+TMU"],["ton_iot","TON_IoT · GLADE+FPTM"],["nslkdd","NSL-KDD · GLADE+FPTM"],["medsec","MedSec · GLADE+FPTM"]];
+const BASE="data/";   // relative → loads from wherever this page is hosted (Pages or local)
+const MODELS=[
+  ["wustl","WUSTL · GLADE+FPTM"],["nslkdd","NSL-KDD · GLADE+FPTM"],["ton_iot","TON_IoT · GLADE+FPTM"],["medsec","MedSec · GLADE+FPTM"],
+  ["tmu_wustl","WUSTL · TMU (unweighted)"],["tmu_nslkdd","NSL-KDD · TMU (unweighted)"],["tmu_ton_iot","TON_IoT · TMU (unweighted)"],["tmu_medsec","MedSec · TMU (unweighted)"],
+  ["gladetmu_wustl","WUSTL · GLADE+TMU"],["gladetmu_nslkdd","NSL-KDD · GLADE+TMU"],["gladetmu_ton_iot","TON_IoT · GLADE+TMU"],["gladetmu_medsec","MedSec · GLADE+TMU"]];
 
 let ATLAS,CLASSES,CLAUSES,FEATURES,BITS,ENGINE,ROWS,COLS,FEATCOLS,AI,PI;
 let SI=0,STEP=0,FILTER='all',CLFILTER='fired',PRED=null,autoTimer=null,HIF=-1;
@@ -412,17 +420,35 @@ function votes(){
   const mx=Math.max(1,...R.scores.map(s=>Math.abs(s)));
   const ranked=R.scores.map((v,k)=>({k,v})).sort((a,b)=>b.v-a.v);
   const runner=ranked.find(o=>o.k!==R.pred)||ranked[1]||{k:R.pred,v:R.scores[R.pred]};
+  // per class: sum the fired supporting (+) vs opposing (−) contributions, so the
+  // total is visibly the arithmetic of the fired rules — not a mystery number.
   $('#votes').innerHTML=CLASSES.map((c,k)=>{
-    const sc=R.scores[k],col=clr(k),w=Math.abs(sc)/mx*48,pos=sc>=0;
-    const fired=R.out.filter((o,ci)=>o>0&&ENGINE.idx[CLAUSES[ci].class]===k).length;
-    return `<div class="vrow ${k===R.pred?'win':''}"><div class="vn" style="color:${col}">${k===R.pred?'👑 ':''}${c}<div style="font-size:10px;color:var(--mut);font-weight:400">${fired} rules fired</div></div>
-      <div class="vtrack"><div class="vzero"></div><div class="vfill" style="background:${pos?col:'var(--neg)'};${pos?'left:50%;width:'+w+'%':'right:50%;width:'+w+'%'}"></div></div>
+    const col=clr(k);
+    let plus=0,minus=0,nUp=0,nDn=0;
+    R.out.forEach((o,ci)=>{ if(o>0 && ENGINE.idx[CLAUSES[ci].class]===k){
+      if(CLAUSES[ci].polarity==='positive'){ plus+=o; nUp++; } else { minus+=o; nDn++; } } });
+    const sc=R.scores[k], pos=sc>=0, w=Math.abs(sc)/mx*48;
+    // mini stacked bar: green block (+) then red block (−), width ∝ contribution
+    const tot=Math.max(1,plus+minus);
+    const seg=`<div class="contribbar"><div class="cseg up" style="width:${plus/tot*100}%" title="${nUp} supporting rules = +${plus}"></div><div class="cseg dn" style="width:${minus/tot*100}%" title="${nDn} opposing rules = −${minus}"></div></div>`;
+    const arith=`<span class="ar up">+${plus}</span> <span class="ar mut">−${minus}</span> <span class="ar mut">=</span> <span class="ar tot" style="color:${col}">${sc>0?'+':''}${sc}</span>`;
+    return `<div class="vrow ${k===R.pred?'win':''}">
+      <div class="vn" style="color:${col}">${k===R.pred?'👑 ':''}${c}
+        <div class="vsub">${nUp} support · ${nDn} oppose</div></div>
+      <div class="vmid">
+        <div class="vtrack"><div class="vzero"></div><div class="vfill" style="background:${pos?col:'var(--neg)'};${pos?'left:50%;width:'+w+'%':'right:50%;width:'+w+'%'}"></div></div>
+        <div class="varith">${arith}</div></div>
       <div class="vscore" style="color:${col}">${sc>0?'+':''}${sc}</div></div>`;
   }).join('');
-  $('#winner').innerHTML=`decision → <span class="wb" style="color:${clr(R.pred)}">${CLASSES[R.pred]}</span>`;
+  $('#winner').innerHTML=`highest total wins → <span class="wb" style="color:${clr(R.pred)}">${CLASSES[R.pred]}</span> <span style="font-size:13px;color:var(--mut)">(${R.scores[R.pred]>0?'+':''}${R.scores[R.pred]})</span>`;
   const truth=AI>=0?classLabel(ROWS[SI][AI]):null;
-  $('#vexplain').innerHTML=`won by <b>${fmt(R.scores[R.pred]-runner.v)}</b> points over ${CLASSES[runner.k]}`+
-    (truth!=null?` · true label <b>${truth}</b> ${truth===CLASSES[R.pred]?'<span style="color:var(--on)">✓ correct</span>':'<span style="color:var(--neg)">✗ wrong</span>'}`:'');
+  // unit-weight model (every clause clamp==1) → "+1/−1"; otherwise each fired rule
+  // adds its own weight, so word it honestly.
+  const unit=ENGINE.clauses.every(c=>c.clamp===1);
+  const ruleWord=unit?`each fired rule adds <b>+1</b> (supports) or <b>−1</b> (opposes) to its class`
+                     :`each fired rule adds its weight (＋ supports / − opposes) to its class`;
+  $('#vexplain').innerHTML=`${ruleWord} · won by <b>${fmt(R.scores[R.pred]-runner.v)}</b> over ${CLASSES[runner.k]}`+
+    (truth!=null?` · true label <b>${truth}</b> ${truth===CLASSES[R.pred]?'<span style="color:var(--on)">✓</span>':'<span style="color:var(--neg)">✗</span>'}`:'');
 }
 
 /* ---- modal: full rule + per-condition ---- */
