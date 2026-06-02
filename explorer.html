@@ -338,13 +338,16 @@ function boolz(){
 function spotlightFeature(){
   $$('#fgrid .fcard').forEach(el=>el.classList.toggle('hi',+el.dataset.fi===HIF));
   if(HIF<0)return; const fname=FEATURES[HIF].name;
-  const using=CLAUSES.filter(c=>(c.featureBands||[]).some(b=>b.feature===fname));
-  const fired=using.filter(c=>R.out[CLAUSES.indexOf(c)]>0);
-  openModal(`Feature “${fname}” = ${fmt(FV[fname])}`,
-    `used by <b>${using.length}</b> rules · <b style="color:var(--on)">${fired.length}</b> fired for this sample`,
-    `<div class="condlist">`+using.slice(0,30).map(c=>{const f=R.out[CLAUSES.indexOf(c)]>0;
-      return `<div class="condrow ${f?'sat':''}"><span class="mk">${f?'🔥':'·'}</span><span style="color:${clr(c.cls?ENGINE.idx[c.class]:0)||0}">Rule ${c.id}</span><span style="color:var(--mut)">${c.polarity==='positive'?'＋':'−'} ${c.class}</span><span style="margin-left:auto;color:var(--mut)">${f?'fired +'+R.out[CLAUSES.indexOf(c)]:'silent'}</span></div>`;
-    }).join('')+`</div>`);
+  // ONLY the rules that fired for THIS sample and use this feature.
+  const fired=CLAUSES.map((c,ci)=>({c,ci})).filter(o=>R.out[o.ci]>0 && (o.c.featureBands||[]).some(b=>b.feature===fname));
+  const body = fired.length
+    ? `<div class="condlist">`+fired.map(o=>`<div class="condrow sat"><span class="mk">🔥</span>
+        <span style="color:${clr(ENGINE.idx[o.c.class])}">Rule ${o.c.id}</span>
+        <span style="color:var(--mut)">${o.c.polarity==='positive'?'＋':'−'} ${o.c.class}</span>
+        <span style="margin-left:auto;color:var(--on)">+${R.out[o.ci]}</span></div>`).join('')+`</div>`
+    : `<div class="lp-info">no firing rule used this feature for this sample</div>`;
+  openModal(`${fname} = ${fmt(FV[fname])}`,
+    `<b style="color:var(--on)">${fired.length}</b> firing rule${fired.length===1?'':'s'} use it for this sample`, body);
 }
 
 function litpan(){
@@ -362,10 +365,14 @@ function litpan(){
   $('#litpan').innerHTML=tiles.join('');
   const t=BV.reduce((a,b)=>a+b,0)+(nb-BV.reduce((a,b)=>a+b,0));
   $('#lpinfo').textContent=`${2*nb} literals · ${t} TRUE · ringed = used by a clause that fired · click a tile`;
-  $$('#litpan .litdot').forEach(el=>el.onclick=()=>{const l=+el.dataset.l,neg=l>=nb,bi=l%nb;
-    const using=CLAUSES.filter(c=>(c.literals||[]).some(x=>x.bit===bi&&((x.operator==='≥')!==neg)));
-    openModal(`Literal ${neg?'¬':''}L${bi}`,`${neg?'¬':''}${BITS[bi].feature} ${neg?'<':'≥'} ${fmt(BITS[bi].threshold)} · used by ${using.length} rules`,
-      `<div class="condlist">`+using.slice(0,30).map(c=>`<div class="condrow ${R.out[CLAUSES.indexOf(c)]>0?'sat':''}"><span class="mk">${R.out[CLAUSES.indexOf(c)]>0?'🔥':'·'}</span>Rule ${c.id} <span style="color:var(--mut)">${c.polarity==='positive'?'＋':'−'} ${c.class}</span></div>`).join('')+`</div>`);
+  $$('#litpan .litdot').forEach(el=>el.onclick=()=>{const l=+el.dataset.l,neg=l>=nb,bi=l%nb,on=neg?(1-BV[bi]):BV[bi];
+    // ONLY firing rules that use this literal for this sample
+    const fired=CLAUSES.map((c,ci)=>({c,ci})).filter(o=>R.out[o.ci]>0 && (o.c.literals||[]).some(x=>x.bit===bi&&((x.operator==='≥')!==neg)));
+    const body=fired.length
+      ? `<div class="condlist">`+fired.map(o=>`<div class="condrow sat"><span class="mk">🔥</span><span style="color:${clr(ENGINE.idx[o.c.class])}">Rule ${o.c.id}</span> <span style="color:var(--mut)">${o.c.polarity==='positive'?'＋':'−'} ${o.c.class}</span><span style="margin-left:auto;color:var(--on)">+${R.out[o.ci]}</span></div>`).join('')+`</div>`
+      : `<div class="lp-info">no firing rule uses this literal for this sample</div>`;
+    openModal(`${neg?'¬':''}${BITS[bi].feature} ${neg?'<':'≥'} ${fmt(BITS[bi].threshold)} = ${on?'TRUE':'FALSE'}`,
+      `<b style="color:var(--on)">${fired.length}</b> firing rule${fired.length===1?'':'s'} use it for this sample`, body);
   });
 }
 
@@ -385,7 +392,7 @@ function drawClauses(){
   if(q)list=list.filter(o=>(o.c.featureBands||[]).some(b=>b.feature.toLowerCase().includes(q)));
   list.sort((a,b)=>b.out-a.out);
   const cap=120;
-  $('#clCount').textContent=`${list.length} rules${list.length>cap?' (showing '+cap+')':''} · ${nFired()} fired total`;
+  $('#clCount').textContent=`${nFired()} rules fired for this sample${CLFILTER!=='fired'?' · showing '+Math.min(list.length,cap)+' of '+list.length:''}`;
   $('#clist').innerHTML=list.slice(0,cap).map((o,i)=>{
     const c=o.c,ci=ENGINE.idx[c.class],col=clr(ci),fired=o.out>0;
     const allb=c.featureBands||[];
