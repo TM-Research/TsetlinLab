@@ -999,7 +999,7 @@ function thermoConds(clause){
 // Notation style depends on the engine: GLADE+FPTM is a thermometer machine, so
 // it keeps the faithful "≥ threshold, ON/OFF" form. TMU-engine models read more
 // naturally with the negation written as "feature < threshold".
-function ltNotation(){ const e=(ATLAS&&ATLAS.metadata&&ATLAS.metadata.engine)||''; return /tmu/i.test(String(e)); }
+function ltNotation(){ return true; }  // every binariser here is threshold/thermometer (bit = feature ≥ threshold) → use ≥/< wording for ALL models
 function tgroup(){
   const lt=ltNotation();
   return [
