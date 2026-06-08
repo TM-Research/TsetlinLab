@@ -947,7 +947,7 @@ function clauseFeatureCount(c){
   if(typeof c.nFeatures==='number') return c.nFeatures;
   return new Set((c.literals||[]).map(l=>l.feature)).size;
 }
-function clauseHasImpossible(c){ return (c.featureBands||[]).some(b=>b.empty); }
+function clauseHasImpossible(c){ return thermoConds(c).some(cd=>cd.impossible); }  // detect from literals (≥/<) so it works for ALL atlases (FPTM and TMU), not just those with featureBands.empty
 function setupClauses(){
   const classes=[...new Set(CLAUSES.map(c=>c.class))];
   $('#clClass').innerHTML='<option value="">all classes</option>'+classes.map(c=>'<option value="'+esc(c)+'">'+esc(c)+'</option>').join('');
