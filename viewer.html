@@ -1005,7 +1005,7 @@ function tgroup(){
   return [
     {key:'on',  cls:'hi',  icon:'▲', label: lt ? 'must be at or above these thresholds (≥)' : 'must REACH these thresholds (≥ is ON)'},
     {key:'off', cls:'lo',  icon: lt?'▼':'△', label: lt ? 'must be below these thresholds (<)' : 'must NOT reach these thresholds (≥ is OFF)'},
-    {key:'imp', cls:'imp', icon:'⚠', label: lt ? 'impossible — one feature must be both ≥ and < the same threshold' : 'impossible — one feature is asked to be ON and OFF at once'},
+    {key:'imp', cls:'imp', icon:'⚠', label: 'impossible — one feature must be both ≥ and < a threshold'},
   ];
 }
 function groupThermo(clause){
@@ -1052,7 +1052,7 @@ function clauseHtml(c){
     insideTxt+'</div>';
   const hasImp = clauseHasImpossible(c);
   const imp = hasImp ? ' <span class="badge warn">has impossible condition</span>' : '';
-  const impNote = hasImp ? '<div class="warn" style="font-size:12px;margin-bottom:4px">⚠ This rule can never fully match — one feature is asked to be both '+(lt?'≥ and &lt;':'ON and OFF')+' the same threshold, so it always falls a little short of its strongest vote.</div>' : '';
+  const impNote = hasImp ? '<div class="warn" style="font-size:12px;margin-bottom:4px">⚠ This rule can never fully match — one feature is asked to be both ≥ and &lt; a threshold, so it always falls a little short of its strongest vote.</div>' : '';
   return '<div class="clause" data-id="'+c.id+'">'+
     '<div class="hd">'+role+imp+
       '<span>'+nFeat+' feature'+(nFeat===1?'':'s')+'</span>'+
