@@ -109,6 +109,33 @@
       <td><div class="acc">94.33%</div><div class="sub"><span style="color:#9ece6a">0 same-bit</span> · <span style="color:#e0af68">127 thermo</span></div></td></tr>
     </tbody>
   </table>
+  <div style="font-weight:600;margin:16px 0 4px">View the rules — GLADE binariser (click to open each engine's clauses)</div>
+  <table class="mx">
+    <thead><tr><th></th>
+      <th class="colhdr"><span class="b">perara (base)</span><span class="s">guard off — baseline</span></th>
+      <th class="colhdr"><span class="b">perara exclusive</span><span class="s">built-in same-bit guard</span></th>
+      <th class="colhdr"><span class="b">Tsetlin_contradiction_fix</span><span class="s">your same-bit fix</span></th>
+    </tr></thead>
+    <tbody>
+    <tr><th>WUSTL-EHMS-2020</th>
+      <td><div class="acc">93.69%</div><div class="sub"><span style="color:#f7768e">61 same-bit · 157 thermo</span></div><a class="vr" href="viewer.html?src=data/perara_wustl_atlas.json&csv=data/perara_wustl_predictions.csv">view rules →</a></td>
+      <td><div class="acc">93.96%</div><div class="sub"><span style="color:#9ece6a">0 same-bit</span> · <span style="color:#e0af68">153 thermo</span></div><a class="vr" href="viewer.html?src=data/perara_excl_wustl_atlas.json&csv=data/perara_excl_wustl_predictions.csv">view rules →</a></td>
+      <td><div class="acc">93.72%</div><div class="sub"><span style="color:#9ece6a">0 same-bit</span> · <span style="color:#e0af68">156 thermo</span></div><a class="vr" href="viewer.html?src=data/cf_wustl_atlas.json&csv=data/cf_wustl_predictions.csv">view rules →</a></td></tr>
+    <tr><th>NSL-KDD</th>
+      <td><div class="acc">99.48%</div><div class="sub"><span style="color:#f7768e">48 same-bit · 133 thermo</span></div><a class="vr" href="viewer.html?src=data/perara_nslkdd_atlas.json&csv=data/perara_nslkdd_predictions.csv">view rules →</a></td>
+      <td><div class="acc">99.46%</div><div class="sub"><span style="color:#9ece6a">0 same-bit</span> · <span style="color:#e0af68">100 thermo</span></div><a class="vr" href="viewer.html?src=data/perara_excl_nslkdd_atlas.json&csv=data/perara_excl_nslkdd_predictions.csv">view rules →</a></td>
+      <td><div class="acc">99.47%</div><div class="sub"><span style="color:#9ece6a">0 same-bit</span> · <span style="color:#e0af68">101 thermo</span></div><a class="vr" href="viewer.html?src=data/cf_nslkdd_atlas.json&csv=data/cf_nslkdd_predictions.csv">view rules →</a></td></tr>
+    <tr><th>TON_IoT</th>
+      <td><div class="acc">96.97%</div><div class="sub"><span style="color:#f7768e">91 same-bit · 258 thermo</span></div><a class="vr" href="viewer.html?src=data/perara_ton_iot_atlas.json&csv=data/perara_ton_iot_predictions.csv">view rules →</a></td>
+      <td><div class="acc">96.93%</div><div class="sub"><span style="color:#9ece6a">0 same-bit</span> · <span style="color:#e0af68">270 thermo</span></div><a class="vr" href="viewer.html?src=data/perara_excl_ton_iot_atlas.json&csv=data/perara_excl_ton_iot_predictions.csv">view rules →</a></td>
+      <td><div class="acc">96.91%</div><div class="sub"><span style="color:#9ece6a">0 same-bit</span> · <span style="color:#e0af68">236 thermo</span></div><a class="vr" href="viewer.html?src=data/cf_ton_iot_atlas.json&csv=data/cf_ton_iot_predictions.csv">view rules →</a></td></tr>
+    <tr><th>MedSec-25</th>
+      <td><div class="acc">96.92%</div><div class="sub"><span style="color:#f7768e">5 same-bit · 23 thermo</span></div><a class="vr" href="viewer.html?src=data/perara_medsec_atlas.json&csv=data/perara_medsec_predictions.csv">view rules →</a></td>
+      <td><div class="acc">96.97%</div><div class="sub"><span style="color:#9ece6a">0 same-bit</span> · <span style="color:#e0af68">28 thermo</span></div><a class="vr" href="viewer.html?src=data/perara_excl_medsec_atlas.json&csv=data/perara_excl_medsec_predictions.csv">view rules →</a></td>
+      <td><div class="acc">97.01%</div><div class="sub"><span style="color:#9ece6a">0 same-bit</span> · <span style="color:#e0af68">17 thermo</span></div><a class="vr" href="viewer.html?src=data/cf_medsec_atlas.json&csv=data/cf_medsec_predictions.csv">view rules →</a></td></tr>
+    </tbody>
+  </table>
+
   <div class="note" style="margin-top:10px"><b>Takeaway:</b> same-bit fixes (yours and perara's guard) are equivalent and reach a <b>true 0</b> on 1-bit encodings; on thermometer binarisers (GLADE / Standard) they clear same-bit but leave thermometer contradictions, which need feature-group handling. The contradiction class depends on the <b>encoding</b>, not the engine.</div>
 
   <h2>Explore each dataset — three views per model</h2>

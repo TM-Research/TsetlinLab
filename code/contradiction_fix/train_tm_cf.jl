@@ -12,7 +12,11 @@ y_test =[parse(Int,l) for l in readlines("$TMP/Y_test.txt")]
 n_bits=length(split(readlines("$TMP/X_train.txt")[1]," "))
 Random.seed!(42)
 tm=TMClassifier(x_train[1],y_train,C,T,S,L,LF,states_num=STATES,include_limit=INCLUDE)
-train!(tm,x_train,y_train,x_test,y_test,EP,shuffle=true,index=true,verbose=0)
+if parse(Bool,get(ENV,"TM_EXCLUSIVE","false"))   # perara's built-in same-bit guard
+    train!(tm,x_train,y_train,x_test,y_test,EP,shuffle=true,index=true,verbose=0,exclusive=true)
+else
+    train!(tm,x_train,y_train,x_test,y_test,EP,shuffle=true,index=true,verbose=0)
+end
 acc=accuracy(predict(tm,x_test,index=true),y_test)
 getbit(M,j,b)=((M[((b-1)>>>6)+1,j]>>((b-1)&63))&UInt64(1))==UInt64(1)
 imp=0
