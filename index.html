@@ -65,6 +65,35 @@
   </table>
   <div class="note">Same train/test split per dataset; per-dataset config matched across engines. <b>The binariser is decisive on hard datasets</b>: holding the engine fixed, GLADE bits lift TON_IoT from 83.0% → 96.6% and MedSec from 87.4% → 96.8% — with fewer bits. Click any cell's <b>view rules</b> to open that exact model and inspect its clauses, encoding and per-sample decision paths. The last two columns isolate the contradiction question. <b>FPTM (perara, base)</b> is <a href="https://github.com/perara/Tsetlin.jl">github.com/perara/Tsetlin.jl</a> with its guard off (self-contradicting rules present). <b>GLADE + FPTM (same-bit fix)</b> is <code>Tsetlin_contradiction_fix.jl</code>, which removes every <b style="color:#9ece6a">same-bit</b> contradiction. Two kinds of contradiction exist: <i>same-bit</i> (one bit asked ON and OFF) and <i>thermometer</i> (a feature asked ≥ a high rung and &lt; a lower rung — different bits). A same-bit fix clears the first; on a thermometer binariser (GLADE) the second remains (shown in <b style="color:#e0af68">orange</b>). With a 1-bit-per-feature encoding (e.g. 1-bit MNIST) there are no rungs, so the same-bit fix reaches a true 0 — verified. See <code>code/contradiction_fix/CONTRADICTION_RESULTS.md</code>.</div>
 
+  <h2>Contradiction-fix verification — same-bit vs thermometer</h2>
+  <div class="note" style="margin-bottom:12px">Two kinds of self-contradiction: <b>same-bit</b> (one bit asked ON and OFF) and <b>thermometer</b> (a feature asked ≥ a high rung and &lt; a lower rung — different bits). The same-bit fix <code>Tsetlin_contradiction_fix.jl</code> and perara's <code>exclusive</code> guard are <b>equivalent</b> — both clear same-bit only. Numbers below are <i>clauses with ≥1 impossible condition</i>, read from the trained masks. <b style="color:#9ece6a">Green = 0.</b></div>
+
+  <div style="font-weight:600;margin:6px 0 4px">1-bit MNIST &nbsp;<span style="color:var(--mut);font-weight:400;font-size:13px">— 1 bit per feature, so thermometer contradictions are structurally impossible</span></div>
+  <table style="border-collapse:collapse;font-size:13px;margin-bottom:18px">
+    <tr style="color:var(--mut)"><th style="text-align:left;padding:4px 14px 4px 0">engine</th><th style="padding:4px 14px">accuracy</th><th style="padding:4px 14px">same-bit</th><th style="padding:4px 14px">thermometer</th></tr>
+    <tr><td style="padding:3px 14px 3px 0">perara base (guard off)</td><td style="text-align:center">97.34%</td><td style="text-align:center;color:#f7768e">1</td><td style="text-align:center;color:#f7768e">1</td></tr>
+    <tr><td style="padding:3px 14px 3px 0">perara <code>exclusive</code> guard</td><td style="text-align:center">97.32%</td><td style="text-align:center;color:#9ece6a">0</td><td style="text-align:center;color:#9ece6a">0</td></tr>
+    <tr><td style="padding:3px 14px 3px 0"><code>Tsetlin_contradiction_fix.jl</code></td><td style="text-align:center">97.28%</td><td style="text-align:center;color:#9ece6a">0</td><td style="text-align:center;color:#9ece6a">0</td></tr>
+  </table>
+
+  <div style="font-weight:600;margin:6px 0 4px">Standard (TMU-style thermometer) binariser &nbsp;<span style="color:var(--mut);font-weight:400;font-size:13px">— multi-bit per feature → thermometer contradictions appear</span></div>
+  <table style="border-collapse:collapse;font-size:13px">
+    <tr style="color:var(--mut)"><th style="text-align:left;padding:4px 14px 4px 0">dataset</th><th style="text-align:left;padding:4px 14px">engine</th><th style="padding:4px 14px">accuracy</th><th style="padding:4px 14px">same-bit</th><th style="padding:4px 14px">thermometer</th></tr>
+    <tr><td>nslkdd</td><td>perara base</td><td style="text-align:center">99.44%</td><td style="text-align:center;color:#f7768e">7</td><td style="text-align:center;color:#f7768e">62</td></tr>
+    <tr><td></td><td>perara exclusive</td><td style="text-align:center">99.41%</td><td style="text-align:center;color:#9ece6a">0</td><td style="text-align:center;color:#e0af68">61</td></tr>
+    <tr><td></td><td>cfix (same-bit)</td><td style="text-align:center">99.44%</td><td style="text-align:center;color:#9ece6a">0</td><td style="text-align:center;color:#e0af68">53</td></tr>
+    <tr><td style="padding-top:6px">ton_iot</td><td style="padding-top:6px">perara base</td><td style="text-align:center;padding-top:6px">82.14%</td><td style="text-align:center;color:#f7768e;padding-top:6px">219</td><td style="text-align:center;color:#f7768e;padding-top:6px">527</td></tr>
+    <tr><td></td><td>perara exclusive</td><td style="text-align:center">84.33%</td><td style="text-align:center;color:#9ece6a">0</td><td style="text-align:center;color:#e0af68">533</td></tr>
+    <tr><td></td><td>cfix (same-bit)</td><td style="text-align:center">83.49%</td><td style="text-align:center;color:#9ece6a">0</td><td style="text-align:center;color:#e0af68">516</td></tr>
+    <tr><td style="padding-top:6px">medsec</td><td style="padding-top:6px">perara base</td><td style="text-align:center;padding-top:6px">90.82%</td><td style="text-align:center;color:#f7768e;padding-top:6px">5</td><td style="text-align:center;color:#f7768e;padding-top:6px">34</td></tr>
+    <tr><td></td><td>perara exclusive</td><td style="text-align:center">90.74%</td><td style="text-align:center;color:#9ece6a">0</td><td style="text-align:center;color:#e0af68">29</td></tr>
+    <tr><td></td><td>cfix (same-bit)</td><td style="text-align:center">90.78%</td><td style="text-align:center;color:#9ece6a">0</td><td style="text-align:center;color:#e0af68">28</td></tr>
+    <tr><td style="padding-top:6px">wustl</td><td style="padding-top:6px">perara base</td><td style="text-align:center;padding-top:6px">94.21%</td><td style="text-align:center;color:#f7768e;padding-top:6px">34</td><td style="text-align:center;color:#f7768e;padding-top:6px">132</td></tr>
+    <tr><td></td><td>perara exclusive</td><td style="text-align:center">94.12%</td><td style="text-align:center;color:#9ece6a">0</td><td style="text-align:center;color:#e0af68">123</td></tr>
+    <tr><td></td><td>cfix (same-bit)</td><td style="text-align:center">94.33%</td><td style="text-align:center;color:#9ece6a">0</td><td style="text-align:center;color:#e0af68">127</td></tr>
+  </table>
+  <div class="note" style="margin-top:10px"><b>Takeaway:</b> same-bit fixes (yours and perara's guard) are equivalent and reach a <b>true 0</b> on 1-bit encodings; on thermometer binarisers (GLADE / Standard) they clear same-bit but leave thermometer contradictions, which need feature-group handling. The contradiction class depends on the <b>encoding</b>, not the engine.</div>
+
   <h2>Explore each dataset — three views per model</h2>
   <table class="mx" style="border-spacing:8px">
     <thead><tr><th></th>
