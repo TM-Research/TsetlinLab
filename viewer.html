@@ -532,7 +532,7 @@
           <span class="muted">each branch merges many clauses into one human concept</span>
         </div>
         <div class="toolbar class-selector-big" style="margin-top:14px">
-          <span class="lbl">show learned representation for</span>
+          <span class="lbl">show class</span>
           <select id="globalFocusClass"></select>
           <span class="muted" id="globalNote" style="font-size:12px"></span>
         </div>
@@ -1676,8 +1676,8 @@ function buildSampleStory(fv, res, winIdx, winLbl){
   });
   const list=Object.values(themes).sort((a,b)=>b.pts-a.pts).slice(0,5);
   if(!list.length) return '';
-  let html='<div class="step"><div class="num">★</div><h3>What the model recognized on this sample</h3>';
-  html+='<div class="muted" style="font-size:12px;margin-bottom:8px">Grouped by <b>idea</b>, not individual rules — the same way the Learn tab summarises the whole model.</div>';
+  let html='<div class="step"><div class="num">★</div><h3>Main reason this row is '+esc(winLbl)+'</h3>';
+  html+='<div class="muted" style="font-size:12px;margin-bottom:8px">These are the strongest learned concepts that matched this row.</div>';
   list.forEach(t=>{
     const prof=profMap[t.feat];
     const learned = prof ? prof.label : 'pattern on this feature';
@@ -2284,8 +2284,8 @@ function showSample(i){
   const winPosFull = CLAUSES.filter(c=>winPos.some(w=>w.id===c.id));
 
   // ---- STEP 1: the decision-flow diagram (readings → rules → class vote) ----
-  html+='<div class="step"><div class="num">1</div><h3>How the decision flowed</h3>';
-  html+='<div class="muted" style="font-size:12px;margin-bottom:4px">trace it left → right: the readings feed the rules that fired, each rule adds points to a class, the highest total wins.</div>';
+  html+='<div class="step"><div class="num">1</div><h3>How the model decided (simple flow)</h3>';
+  html+='<div class="muted" style="font-size:12px;margin-bottom:4px">Input values activate learned patterns. Those patterns vote for classes. The class with the most points wins.</div>';
   html+=flowDiagramSvg(fv, res, winIdx, runner.k!==winIdx?runner.k:null, classes);
   html+='<div class="leg"><span><i style="background:#3a4a6a"></i> reading → rule</span><span><i style="background:var(--pos)"></i> rule → class (thicker = more points)</span><span><i style="background:#1a2417;border:1px solid var(--pos)"></i> winning class</span></div>';
   html+='</div>';
@@ -2296,20 +2296,20 @@ function showSample(i){
     .sort((a,b)=>b.out-a.out);
   const firedWin = allFired.filter(o=>String(o.c.class)===winLbl);
   const FR_TOP=8;
-  html+='<div class="step"><div class="num">2</div><h3>Which rules fired ('+allFired.length+')</h3>';
-  html+='<div class="muted" style="font-size:12px;margin-bottom:2px">'+allFired.length+' rules matched this sample; '+firedWin.length+' of them belong to the winning class <b>'+esc(winLbl)+'</b>. Bar length = votes; green adds to its class, red subtracts.</div>';
+  html+='<div class="step"><div class="num">2</div><h3>Strongest evidence for '+esc(winLbl)+'</h3>';
+  html+='<div class="muted" style="font-size:12px;margin-bottom:2px">These matched patterns gave the biggest positive push to <b>'+esc(winLbl)+'</b>. Longer bars mean stronger impact.</div>';
   html+='<div id="firedRules">'+firedRulesHtml(firedWin.slice(0,FR_TOP), winLbl, classes)+'</div>';
-  if(firedWin.length>FR_TOP) html+='<button class="linklike" id="moreFiredWin">show all '+firedWin.length+' winning-class rules…</button>';
-  html+='<details style="margin-top:6px"><summary>'+allFired.length+' fired rules across all classes</summary><div style="margin-top:6px" id="firedAll">'+firedRulesHtml(allFired.slice(0,40), winLbl, classes)+(allFired.length>40?'<div class="muted" style="font-size:11px">showing 40 of '+allFired.length+'</div>':'')+'</div></details>';
+  if(firedWin.length>FR_TOP) html+='<button class="linklike" id="moreFiredWin">show all '+firedWin.length+' evidence rules…</button>';
+  html+='<details style="margin-top:6px"><summary>show all '+allFired.length+' fired patterns (advanced)</summary><div style="margin-top:6px" id="firedAll">'+firedRulesHtml(allFired.slice(0,40), winLbl, classes)+(allFired.length>40?'<div class="muted" style="font-size:11px">showing 40 of '+allFired.length+'</div>':'')+'</div></details>';
   html+='</div>';
 
   // ---- STEP 3: the readings, as feature chips ----
   const keyFeats=new Set();
   winPosFull.forEach(c=>(c.featureBands||[]).forEach(b=>keyFeats.add(b.feature)));
   const keyList=[...keyFeats];
-  html+='<div class="step"><div class="num">3</div><h3>What the sensors showed</h3>';
+  html+='<div class="step"><div class="num">3</div><h3>Key input values used in this decision</h3>';
   if(keyList.length){
-    html+='<div class="muted" style="font-size:12px;margin-bottom:4px">readings the deciding rules looked at:</div>';
+    html+='<div class="muted" style="font-size:12px;margin-bottom:4px">These values were referenced by the winning evidence patterns:</div>';
     html+='<div>'+keyList.slice(0,16).map(f=>'<span class="feat-key">'+esc(f)+' <span class="fv">'+esc(fmtNum(fv[f]))+'</span></span>').join('')+'</div>';
   }
   const allFeatChips=PRED.featCols.map(fc=>'<span class="feat-key">'+esc(fc.name)+' <span class="fv">'+esc(fmtNum(r[fc.col]))+'</span></span>').join('');
@@ -2317,28 +2317,28 @@ function showSample(i){
 
   // ---- STEP 3: how the classes scored (SVG diverging vote chart) ----
   const showN=Math.min(TOP_CLASSES, ranked.length);
-  html+='<div class="step"><div class="num">4</div><h3>How each class scored</h3>';
-  html+='<div class="muted" style="font-size:12px;margin-bottom:4px">each rule that matches adds points for its class (right, green) or takes them away (left, red); the highest total wins.</div>';
+  html+='<div class="step"><div class="num">4</div><h3>Scoreboard: winner vs other classes</h3>';
+  html+='<div class="muted" style="font-size:12px;margin-bottom:4px">Right/green means support. Left/red means opposition. The highest final score wins.</div>';
   html+='<div id="scoreBars">'+voteChartSvg(ranked.slice(0,showN), classes, winIdx, runner.k)+'</div>';
   if(ranked.length>showN) html+='<button class="linklike" id="moreScores">show all '+ranked.length+' classes…</button>';
   html+='</div>';
 
   // ---- why the winner ----
   const winCards = winPosFull.map(c=>({c,out:res.clauseOut[c.id].out})).sort((a,b)=>b.out-a.out);
-  html+='<div class="step"><div class="num">5</div><h3>Why “'+esc(winLbl)+'” — the rules in detail</h3>';
+  html+='<div class="step"><div class="num">5</div><h3>Detailed breakdown for '+esc(winLbl)+'</h3>';
   if(winCards.length){
-    html+='<div class="muted" style="font-size:12px;margin-bottom:6px">'+winCards.length+' supporting rule'+(winCards.length===1?'':'s')+' matched this sample. The strongest:</div>';
-    html+='<div class="muted" style="font-size:11px;margin-bottom:4px">the strongest rule shows a gauge per reading: ▮ dot = your value, shaded zone = where the “≥ threshold” bit turns ON.</div>';
+    html+='<div class="muted" style="font-size:12px;margin-bottom:6px">'+winCards.length+' supporting pattern'+(winCards.length===1?'':'s')+' matched this row. Top patterns:</div>';
+    html+='<div class="muted" style="font-size:11px;margin-bottom:4px">In the first card, each gauge shows your value against the learned threshold.</div>';
     html+='<div id="winRules">'+winCards.slice(0,TOP_RULES).map((o,idx)=>ruleCard(o.c,fv,o.out,true,idx===0)).join('')+'</div>';
     if(winCards.length>TOP_RULES) html+='<button class="linklike" id="moreWin">show '+(winCards.length-TOP_RULES)+' more supporting rules…</button>';
   } else {
-    html+='<div class="muted">No supporting rule matched strongly; this class won mainly because the others scored lower.</div>';
+    html+='<div class="muted">No strong supporting pattern fired; this class still won because other classes scored even lower.</div>';
   }
   // objections against the winner (negative clauses of winner that fired)
   const winNeg = CLAUSES.filter(c=>String(c.class)===winLbl && c.polarity==='negative' && res.clauseOut[c.id].out>0)
                         .map(c=>({c,out:res.clauseOut[c.id].out})).sort((a,b)=>b.out-a.out);
   if(winNeg.length){
-    html+='<details style="margin-top:8px"><summary>'+winNeg.length+' rule'+(winNeg.length===1?'':'s')+' pushed against “'+esc(winLbl)+'” (it still won)</summary><div style="margin-top:6px">'+
+    html+='<details style="margin-top:8px"><summary>'+winNeg.length+' opposing pattern'+(winNeg.length===1?'':'s')+' also fired (advanced)</summary><div style="margin-top:6px">'+
       winNeg.slice(0,TOP_RULES).map(o=>ruleCard(o.c,fv,o.out,false)).join('')+'</div></details>';
   }
   html+='</div>';
@@ -2351,15 +2351,15 @@ function showSample(i){
     const runNeg=CLAUSES.filter(c=>String(c.class)===runLbl && c.polarity==='negative' && res.clauseOut[c.id].out>0)
                         .map(c=>({c,out:res.clauseOut[c.id].out})).sort((a,b)=>b.out-a.out);
     const runPosPts=runPos.reduce((a,o)=>a+o.out,0), runNegPts=runNeg.reduce((a,o)=>a+o.out,0);
-    html+='<div class="step"><div class="num">6</div><h3>Why not “'+esc(runLbl)+'”</h3>';
+    html+='<div class="step"><div class="num">6</div><h3>Why '+esc(runLbl)+' lost</h3>';
     // Always show a clear, non-empty explanation — even when no positive rule fired.
     html+='<div class="muted" style="font-size:12px;margin-bottom:6px"><b>'+esc(winLbl)+'</b> scored <b>'+fmtNum(scores[winIdx])+'</b>, '+
       esc(runLbl)+' scored <b>'+fmtNum(runner.v)+'</b> — a gap of '+fmtNum(scores[winIdx]-runner.v)+'.</div>';
     if(!runPos.length){
       html+='<div class="rule"><div class="muted" style="font-size:12px">'+
-        'No supporting rule for <b>'+esc(runLbl)+'</b> matched this sample'+
-        (runNeg.length?(', and '+runNeg.length+' rule'+(runNeg.length===1?'':'s')+' actively argued against it (−'+runNegPts+' points)'):'')+
-        '. With '+(runPos.length? '':'no points for and ')+(runNeg.length?('−'+runNegPts):'0')+' against, it could not catch '+esc(winLbl)+'.'+
+        '<b>'+esc(runLbl)+'</b> had no strong supporting pattern on this row'+
+        (runNeg.length?(', and '+runNeg.length+' opposing pattern'+(runNeg.length===1?'':'s')+' pushed it down (−'+runNegPts+' points)'):'')+
+        '. So it stayed below '+esc(winLbl)+'.'+
         '</div></div>';
     } else {
       html+='<div class="muted" style="font-size:12px;margin-bottom:4px">'+esc(runLbl)+' did get +'+runPosPts+' from '+runPos.length+' supporting rule'+(runPos.length===1?'':'s')+
