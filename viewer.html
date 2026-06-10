@@ -598,14 +598,18 @@
           <span class="spacer"></span>
           <span class="lbl" id="predCount"></span>
         </div>
+        <div class="muted" style="font-size:12px;margin:2px 0 10px">
+          <b>Order:</b> 1) choose a sample on the left, 2) read its decision path on the right.
+        </div>
         <div class="explain-split">
           <div class="scrollbox" id="predListBox">
+            <div class="muted" style="padding:8px 10px;border-bottom:1px solid var(--line);font-size:12px"><b>1) Samples</b></div>
             <table id="predTable"><thead></thead><tbody></tbody></table>
             <div class="pager" id="predPager"></div>
           </div>
           <div class="panel" id="predDetail">
-            <h2>Prediction explanation</h2>
-            <p class="muted">Click a sample on the left to see: main reason, key evidence, score comparison, and why alternatives lost.</p>
+            <h2>2) Decision path</h2>
+            <p class="muted">After selecting a sample, this panel shows main reason, key evidence, score comparison, and why alternatives lost.</p>
           </div>
         </div>
       </div>
@@ -2445,7 +2449,7 @@ function showSample(i){
 
   const replay = ANIMATE ? ' <button class="linklike" id="replayFlow" title="play the flow again">▶ replay</button>' : '';
   $('#predDetail').classList.toggle('flow', ANIMATE);
-  $('#predDetail').innerHTML='<h2>Prediction explanation'+replay+'</h2>'+html;
+  $('#predDetail').innerHTML='<h2>2) Decision path'+replay+'</h2>'+html;
   // wire progressive-disclosure buttons
   if($('#moreFiredWin')) $('#moreFiredWin').onclick=()=>{ $('#firedRules').innerHTML=firedRulesHtml(firedWin, winLbl, classes); $('#moreFiredWin').remove(); };
   if($('#moreScores')) $('#moreScores').onclick=()=>{ $('#scoreBars').innerHTML=voteChartSvg(ranked, classes, winIdx, runner.k); $('#moreScores').remove(); };
