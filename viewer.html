@@ -230,6 +230,78 @@
   .acthint{color:var(--mut);font-size:12px;margin-bottom:8px}
   .actgrid{display:grid;grid-template-columns:1fr 1fr;gap:16px}
   @media (max-width:980px){ .actgrid{grid-template-columns:1fr} }
+  /* ---- Learn tab: aggregated learning profiles (not rule lists) ---- */
+  .learn-intro{font-size:13px;line-height:1.65;color:var(--mut);max-width:920px}
+  .learn-prose{font-size:14px;line-height:1.7;margin:10px 0 14px;padding:12px 14px;background:var(--panel2);border:1px solid var(--line);border-radius:8px}
+  .learn-prose b{color:var(--fg)}
+  .dirchip{display:inline-block;border-radius:6px;padding:2px 9px;margin:2px 4px 2px 0;font-size:12px;border:1px solid var(--line)}
+  .dirchip.hi{border-color:#33502a;background:#16241a;color:var(--pos)}
+  .dirchip.lo{border-color:#33415e;background:#1a2130;color:var(--acc)}
+  .dirchip.band{border-color:#5a4a26;background:#241f14;color:var(--warn)}
+  .couple{display:flex;gap:6px;align-items:center;flex-wrap:wrap;padding:8px 10px;border:1px solid var(--line);border-radius:8px;background:var(--panel2);margin-bottom:6px;font-size:13px}
+  .couple .link{color:var(--mut);font-size:11px;text-transform:uppercase;letter-spacing:.04em}
+  .stripwrap{overflow:auto;border:1px solid var(--line);border-radius:8px;background:var(--panel2);padding:8px}
+  .storycard{border:1px solid var(--line);border-radius:10px;padding:12px 14px;margin-bottom:10px;background:var(--panel2)}
+  .storycard h4{margin:0 0 6px;font-size:13px;font-weight:600}
+  .storycard .pts{font-size:12px;color:var(--pos);font-weight:600}
+  .storycard .read{font-size:12px;color:var(--mut);margin-top:4px}
+  /* ---- Trees tab: one tree per class ---- */
+  .forest-intro{font-size:13px;line-height:1.65;color:var(--mut);max-width:960px}
+  .forest-legend{display:flex;gap:14px;flex-wrap:wrap;font-size:12px;margin:10px 0 0}
+  .forest-legend span{display:inline-flex;align-items:center;gap:5px}
+  .forest-legend .dot{width:10px;height:10px;border-radius:50%}
+  .forest-legend .dot.pos{background:var(--pos)} .forest-legend .dot.neg{background:var(--neg)}
+  .forest{display:grid;grid-template-columns:repeat(auto-fit,minmax(340px,1fr));gap:16px}
+  @media (min-width:1400px){ .forest{grid-template-columns:repeat(2,1fr)} }
+  .classtree{border:1px solid var(--line);border-radius:12px;background:var(--panel);overflow:hidden}
+  .classtree-hd{padding:12px 14px;border-bottom:1px solid var(--line);background:var(--panel2);cursor:pointer;user-select:none;display:flex;align-items:center;gap:10px}
+  .classtree-hd:hover{border-color:var(--acc)}
+  .classtree-hd .chev{color:var(--mut);font-size:11px;width:14px}
+  .classtree-hd .clsname{font-size:15px;font-weight:700;flex:1}
+  .classtree-hd .clsmeta{font-size:11px;color:var(--mut)}
+  .classtree-bd{padding:12px 14px 14px;display:none}
+  .classtree.open .classtree-bd{display:block}
+  .classtree.open .chev{transform:rotate(90deg)}
+  .troot{font-size:12px;color:var(--mut);margin:0 0 10px;padding:8px 10px;background:var(--panel2);border-radius:8px;border:1px solid var(--line)}
+  .troot b{color:var(--fg)}
+  ul.ptree, ul.ptree ul{list-style:none;margin:0;padding:0}
+  ul.ptree ul{margin-left:16px;padding-left:12px;border-left:2px solid var(--line)}
+  ul.ptree > li{margin-bottom:10px}
+  ul.ptree ul > li{margin:5px 0;position:relative}
+  .tnode{display:flex;align-items:flex-start;gap:8px;font-size:13px;line-height:1.45}
+  .tnode .tic{font-size:14px;line-height:1.2;flex-shrink:0}
+  .tnode .tlab{flex:1}
+  .tnode .tmeta{font-size:11px;color:var(--mut);white-space:nowrap}
+  .tnode.branch-pos .tlab b{color:var(--pos)}
+  .tnode.branch-neg .tlab b{color:var(--neg)}
+  .tnode.leaf-hi .tlab{color:var(--pos)}
+  .tnode.leaf-lo .tlab{color:var(--acc)}
+  .tnode.leaf-band .tlab{color:var(--warn)}
+  .tnode.leaf-opp .tlab{color:var(--neg)}
+  .tnode .subfeat{font-size:12px;color:var(--mut);margin-top:2px}
+  .forest-empty{padding:24px;text-align:center;color:var(--mut)}
+  /* ---- Global tab: learned representation tree diagrams ---- */
+  .global-grid{display:grid;grid-template-columns:1fr;gap:16px}
+  .gsig{border:1px solid var(--line);border-radius:12px;background:var(--panel);overflow:hidden}
+  .gsig-hd{padding:12px 14px;background:var(--panel2);border-bottom:1px solid var(--line)}
+  .gsig-hd .gtitle{font-size:16px;font-weight:700;margin:0 0 4px}
+  .gsig-hd .gmeta{font-size:11px;color:var(--mut)}
+  .gsig-bd{padding:14px 16px;font-size:13px;line-height:1.65}
+  .gtree-wrap{margin:0 0 4px;border:1px solid var(--line);border-radius:10px;background:#0c0e14;overflow:auto;padding:8px}
+  .gtree-wrap svg{display:block;width:100%;height:auto;min-width:480px}
+  .gsig-details{margin-top:8px}
+  .gsig-details summary{cursor:pointer;color:var(--acc);font-size:12px}
+  .gsig-bd .gone{margin:0 0 12px;padding:10px 12px;background:#16241a;border:1px solid #33502a;border-radius:8px;color:var(--fg)}
+  .gsig-bd .gone b{color:var(--pos)}
+  .gsig-bd .gstruct{margin:10px 0;padding:10px 12px;background:var(--panel2);border:1px solid var(--line);border-radius:8px;font-family:ui-monospace,monospace;font-size:12px;line-height:1.55;color:var(--mut)}
+  .gsig-bd .gstruct .hl{color:var(--acc)}
+  .gsig-bd .gstruct .pos{color:var(--pos)}
+  .gsig-bd .gstruct .neg{color:var(--neg)}
+  .gsig-fp{display:flex;flex-wrap:wrap;gap:6px;margin:8px 0}
+  .gsig-fp .fpchip{font-size:12px;padding:3px 10px;border-radius:6px;border:1px solid var(--line);background:var(--chip)}
+  .gsig-fp .fpchip.hi{border-color:#33502a;color:var(--pos)}
+  .gsig-fp .fpchip.lo{border-color:#33415e;color:var(--acc)}
+  .gsig-fp .fpchip.band{border-color:#5a4a26;color:var(--warn)}
   /* ---- Encoding tab: one feature -> bits -> literals ---- */
   .enctoolbar{display:flex;gap:14px;align-items:center;flex-wrap:wrap;margin-bottom:10px}
   .encval{font-size:22px;font-weight:700;color:var(--acc);font-variant-numeric:tabular-nums}
@@ -302,6 +374,9 @@
       <button data-tab="bits">Bits</button>
       <button data-tab="encoding">Encoding</button>
       <button data-tab="clauses">Rules</button>
+      <button data-tab="learn">Learn</button>
+      <button data-tab="global">Global</button>
+      <button data-tab="trees">Trees</button>
       <button data-tab="activity">Activity</button>
       <button data-tab="predictions">Explain</button>
     </div>
@@ -406,6 +481,62 @@
         <div id="clList"></div>
         <div class="pager" id="clPager"></div>
       </div>
+    </section>
+
+    <!-- LEARN — what the model learned (aggregated, not rule-by-rule) -->
+    <section id="tab-learn" class="hidden">
+      <div class="panel">
+        <h2>Learning Profile</h2>
+        <p class="learn-intro">A Tsetlin Machine stores hundreds of overlapping patterns. This view <b>folds them together</b> into what the model actually learned: which readings push each class up or down, which features tend to move together, and where the decision boundary sits in feature space. No rule-by-rule list — just the shape of the learned behaviour.</p>
+        <div class="toolbar" style="margin-top:12px">
+          <span class="lbl">class</span><select id="learnClass"></select>
+          <span class="muted" id="learnWeightNote" style="font-size:12px"></span>
+        </div>
+      </div>
+      <div id="learnBody"></div>
+    </section>
+
+    <!-- GLOBAL — one merged signature per class (all rules folded into one view) -->
+    <section id="tab-global" class="hidden">
+      <div class="panel">
+        <h2>Visualization of learned representations</h2>
+        <p class="learn-intro">Each class has many learned patterns. This tab draws a <b>tree diagram</b> per class — all rules folded into one visual structure: root → vote → FOR / AGAINST branches → theme families → co-features. Read the diagram top-down; bar width = learning strength.</p>
+        <div class="forest-legend" style="margin-top:10px">
+          <span><i class="dot pos"></i> ➕ supporting branch</span>
+          <span><i class="dot neg"></i> ➖ opposing branch</span>
+          <span class="muted">∨ = any matching family adds points</span>
+        </div>
+        <div class="toolbar" style="margin-top:14px">
+          <span class="lbl">find class</span>
+          <input type="search" id="globalSearch" placeholder="class name…" style="min-width:200px">
+          <label><input type="checkbox" id="globalFocusOne"> focus one class</label>
+          <select id="globalFocusClass" class="hidden" style="min-width:160px"></select>
+          <span class="muted" id="globalNote" style="font-size:12px"></span>
+        </div>
+      </div>
+      <div id="globalGrid" class="global-grid"></div>
+    </section>
+
+    <!-- TREES — one clear tree per class -->
+    <section id="tab-trees" class="hidden">
+      <div class="panel">
+        <h2>Pattern trees — one per class</h2>
+        <p class="forest-intro">The model is <b>not</b> one decision tree. It is <b>many trees at once</b> — one summary tree per class. Each tree shows what that class <b>learned</b>: grouped ideas (not hundreds of rules). At prediction time every class tree “speaks”; the class with the highest total score wins.</p>
+        <div class="forest-legend">
+          <span><i class="dot pos"></i> ➕ patterns that push this class up</span>
+          <span><i class="dot neg"></i> ➖ patterns that push this class down</span>
+          <span class="muted">load a samples CSV to weight branches by real firings</span>
+        </div>
+        <div class="toolbar" style="margin-top:14px">
+          <span class="lbl">find class</span>
+          <input type="search" id="treeSearch" placeholder="class name…" style="min-width:200px">
+          <button type="button" id="treeExpandAll">expand all</button>
+          <button type="button" id="treeCollapseAll">collapse all</button>
+          <span class="spacer"></span>
+          <span class="muted" id="treeCount" style="font-size:12px"></span>
+        </div>
+      </div>
+      <div id="treeForest" class="forest"></div>
     </section>
 
     <!-- ACTIVITY -->
@@ -708,7 +839,7 @@ function loadAtlas(obj, name){
     $('#drop').classList.add('hidden'); $('#app').classList.remove('hidden');
     setSrcName(name, obj);
     $$('#tabs button[data-tab="bits"]').forEach(b=>b.classList.toggle('hidden', BITS.length===0));
-    renderOverview(); renderFeatures(); renderBits(); setupEncoding(); setupClauses(); renderActivityStatic();
+    renderOverview(); renderFeatures(); renderBits(); setupEncoding(); setupClauses(); setupLearn(); setupGlobal(); setupTrees(); renderLearn(); renderGlobal(); renderTrees(); renderActivityStatic();
     if(PRED){ recompute(); } else { maybeSwitchPredTab(); }
     // try to bring up a WASM engine in the background; on success it becomes
     // the active inference path and predictions are recomputed through it.
@@ -773,7 +904,7 @@ else window.addEventListener('load', autoLoad);
 // ---------------------------------------------------------------- tabs
 $$('#tabs button').forEach(b=>b.addEventListener('click',()=>{
   $$('#tabs button').forEach(x=>x.classList.toggle('on', x===b));
-  ['overview','features','bits','encoding','clauses','activity','predictions'].forEach(t=>$('#tab-'+t).classList.toggle('hidden', t!==b.dataset.tab));
+  ['overview','features','bits','encoding','clauses','learn','global','trees','activity','predictions'].forEach(t=>$('#tab-'+t).classList.toggle('hidden', t!==b.dataset.tab));
 }));
 function gotoTab(name){ const b=$('#tabs button[data-tab="'+name+'"]'); if(b) b.click(); }
 
@@ -1154,7 +1285,7 @@ function recompute(){
   }
   COMP={pred,correct,nact,ai,nCorrect,nLabelled,
         clauseFire,clauseVotes,featUse,sumFired,nSamples:n};
-  renderSummary(); renderPred(); renderActivity();
+  renderSummary(); renderPred(); renderLearn(); renderGlobal(); renderTrees(); renderActivity();
   // auto-open the first sample so an explanation is visible immediately
   const first=predFiltered()[0];
   if(first){ predState.sel=first.idx; renderPred(); showSample(first.idx); }
@@ -1198,6 +1329,535 @@ function renderSummary(){
       '<div class="track"><div class="fill pos" style="left:0;width:'+(o.v/n*100)+'%"></div></div><div class="val">'+o.v+'</div></div>').join('');
     $('#sumMore').remove();
   };
+}
+
+// ===========================================================================
+//  LEARN TAB — Learning Profile Method
+//  Aggregates the clause bank into human-scale "what it learned" views:
+//  (1) per-class feature directions, (2) feature couplings, (3) 2D decision strip,
+//  (4) per-sample theme story in Explain tab.
+// ===========================================================================
+let learnState={clsIdx:0};
+
+function clauseLearnWeight(clauseIdx, clause){
+  const base=Math.max(1, +(clause.clamp||1));
+  if(COMP && COMP.clauseVotes && COMP.clauseVotes[clauseIdx]>0)
+    return COMP.clauseVotes[clauseIdx] / Math.max(1, COMP.clauseFire[clauseIdx]);
+  return base;
+}
+
+// Fold all clauses for one class into per-feature learning signals.
+function buildClassProfile(clsIdx){
+  const cls=ENGINE.classes[clsIdx];
+  const hi={}, lo={}, hiOpp={}, loOpp={};
+  ENGINE.clauses.forEach((eng,ci)=>{
+    if(eng.clsIdx!==clsIdx) return;
+    const c=CLAUSES.find(x=>x.id===eng.id)||eng;
+    const w=clauseLearnWeight(ci,c);
+    const pol=eng.polarity==='positive';
+    thermoConds(c).forEach(cd=>{
+      if(cd.impossible) return;
+      const f=cd.feature;
+      if(pol){
+        if(cd.state==='on') hi[f]=(hi[f]||0)+w;
+        else lo[f]=(lo[f]||0)+w;
+      } else {
+        if(cd.state==='on') hiOpp[f]=(hiOpp[f]||0)+w;
+        else loOpp[f]=(loOpp[f]||0)+w;
+      }
+    });
+  });
+  const feats=new Set([...Object.keys(hi),...Object.keys(lo),...Object.keys(hiOpp),...Object.keys(loOpp)]);
+  const rows=[...feats].map(f=>{
+    const pushHi=(hi[f]||0)-(hiOpp[f]||0);
+    const pushLo=(lo[f]||0)-(loOpp[f]||0);
+    const total=Math.abs(pushHi)+Math.abs(pushLo);
+    let kind='neutral', label='mixed signal';
+    if(total<0.01){ kind='neutral'; label='barely used'; }
+    else if(pushHi>0 && pushLo>0) { kind='band'; label='value band (not too low, not too high)'; }
+    else if(pushHi>pushLo*1.3 && pushHi>0) { kind='hi'; label='prefers high readings'; }
+    else if(pushLo>pushHi*1.3 && pushLo>0) { kind='lo'; label='prefers low readings'; }
+    else if(pushHi<0 && pushLo<=0) { kind='lo'; label='avoids high readings'; }
+    else if(pushLo<0 && pushHi<=0) { kind='hi'; label='avoids low readings'; }
+    return {name:f, pushHi, pushLo, total, kind, label};
+  }).filter(r=>r.total>0.01).sort((a,b)=>b.total-a.total);
+  return {cls, rows};
+}
+
+function buildCouplings(clsIdx, topN){
+  topN=topN||8;
+  const pairs={};
+  ENGINE.clauses.forEach((eng,ci)=>{
+    if(eng.clsIdx!==clsIdx || eng.polarity!=='positive') return;
+    const c=CLAUSES.find(x=>x.id===eng.id)||eng;
+    const w=clauseLearnWeight(ci,c);
+    const feats=[...new Set(thermoConds(c).filter(cd=>!cd.impossible).map(cd=>cd.feature))];
+    for(let i=0;i<feats.length;i++) for(let j=i+1;j<feats.length;j++){
+      const key=feats[i]+'\0'+feats[j];
+      pairs[key]=(pairs[key]||0)+w;
+    }
+  });
+  return Object.keys(pairs).map(k=>{
+    const [a,b]=k.split('\0');
+    return {a,b,w:pairs[k]};
+  }).sort((x,y)=>y.w-x.w).slice(0,topN);
+}
+
+function profileProse(profile){
+  const top=profile.rows.slice(0,5);
+  if(!top.length) return 'The model has not anchored this class to any strong feature directions yet.';
+  const bits=top.map(r=>'<b>'+esc(r.name)+'</b> ('+esc(r.label)+')').join(', ');
+  return 'For <b>'+esc(profile.cls)+'</b>, the model mainly learned to look at '+bits+
+    (profile.rows.length>5?' … and '+ (profile.rows.length-5)+' more signals':'')+'.';
+}
+
+function featureMedians(){
+  const med={};
+  if(!PRED || !PRED.rows.length) return med;
+  PRED.featCols.forEach(fc=>{
+    const vals=PRED.rows.map(r=>+r[fc.col]).filter(Number.isFinite);
+    if(!vals.length) return;
+    vals.sort((a,b)=>a-b);
+    med[fc.name]=vals[Math.floor(vals.length/2)];
+  });
+  return med;
+}
+
+function featureDefault(feat){
+  const med=featureMedians()[feat];
+  if(Number.isFinite(med)) return med;
+  const f=FEATURES.find(x=>x.name===feat);
+  if(f && f.range) return (f.range[0]+f.range[1])/2;
+  const th=(f&&f.thresholds&&f.thresholds.length)?f.thresholds: [0];
+  return th[Math.floor(th.length/2)];
+}
+
+// 2-feature margin map: colour = how strongly this class beats the runner-up.
+function decisionStripSvg(clsIdx, f1, f2){
+  const classes=ENGINE.classes, nCls=classes.length;
+  const med=featureMedians();
+  const base={};
+  FEATURES.forEach(f=>{ base[f.name]=featureDefault(f.name); });
+  const f1r=FEATURES.find(x=>x.name===f1), f2r=FEATURES.find(x=>x.name===f2);
+  const xLo=f1r&&f1r.range?f1r.range[0]:0, xHi=f1r&&f1r.range?f1r.range[1]:1;
+  const yLo=f2r&&f2r.range?f2r.range[0]:0, yHi=f2r&&f2r.range?f2r.range[1]:1;
+  const GR=14;
+  const xs=[], ys=[];
+  for(let i=0;i<GR;i++) xs.push(xLo+(xHi-xLo)*i/(GR-1));
+  for(let j=0;j<GR;j++) ys.push(yLo+(yHi-yLo)*j/(GR-1));
+  let maxM=0, cells=[];
+  for(let j=0;j<GR;j++) for(let i=0;i<GR;i++){
+    const fv={...base, [f1]:xs[i], [f2]:ys[j]};
+    const res=evalUnified(fv,false);
+    const scores=res.scores;
+    const ranked=scores.map((v,k)=>({k,v})).sort((a,b)=>b.v-a.v);
+    const win=ranked[0].k, run=ranked[1]?ranked[1].k:win;
+    const margin = win===clsIdx ? scores[clsIdx]-scores[run] : -(scores[win]-scores[clsIdx]);
+    maxM=Math.max(maxM, Math.abs(margin));
+    cells.push({i,j,margin,win});
+  }
+  maxM=Math.max(maxM,1);
+  const W=420,H=320,padL=52,padB=36,padT=12,padR=12;
+  const cw=(W-padL-padR)/GR, ch=(H-padT-padB)/GR;
+  let s='<svg viewBox="0 0 '+W+' '+H+'" preserveAspectRatio="xMidYMid meet" role="img">';
+  cells.forEach(c=>{
+    const t=c.margin/maxM;
+    const col = c.margin>0 ? 'rgba(158,206,106,'+(0.15+0.75*Math.min(1,t))+')'
+                           : 'rgba(247,118,142,'+(0.1+0.5*Math.min(1,-t))+')';
+    s+='<rect x="'+(padL+c.i*cw)+'" y="'+(padT+(GR-1-c.j)*ch)+'" width="'+cw+'" height="'+ch+'" fill="'+col+'" stroke="var(--line)" stroke-width="0.3"/>';
+  });
+  s+='<text class="gt" x="'+(padL+(W-padL-padR)/2)+'" y="'+(H-8)+'" text-anchor="middle">'+esc(f1)+' →</text>';
+  s+='<text class="gt" x="14" y="'+(padT+(H-padT-padB)/2)+'" text-anchor="middle" transform="rotate(-90 14 '+(padT+(H-padT-padB)/2)+')">'+esc(f2)+' →</text>';
+  s+='<text class="gt" x="'+(W-8)+'" y="'+(padT+8)+'" text-anchor="end">green = '+esc(classes[clsIdx])+' ahead</text>';
+  return s+'</svg>';
+}
+
+function setupLearn(){
+  if(!ENGINE) return;
+  const sel=$('#learnClass');
+  sel.innerHTML=ENGINE.classes.map((c,i)=>'<option value="'+i+'">'+esc(c)+'</option>').join('');
+  learnState.clsIdx=0;
+  sel.onchange=()=>{ learnState.clsIdx=+sel.value; renderLearn(); };
+}
+
+function renderLearn(){
+  if(!ENGINE || !CLAUSES.length){ $('#learnBody').innerHTML=''; return; }
+  const clsIdx=learnState.clsIdx;
+  const profile=buildClassProfile(clsIdx);
+  const couples=buildCouplings(clsIdx);
+  const f1=profile.rows[0]?profile.rows[0].name:null;
+  const f2=profile.rows[1]?profile.rows[1].name:null;
+  $('#learnWeightNote').textContent = COMP && COMP.clauseFire
+    ? 'weighted by how strongly patterns fired on your '+COMP.nSamples+' loaded samples'
+    : 'weighted by pattern strength in the rule bank (load samples for firing-weighted view)';
+  const maxT=Math.max(1,...profile.rows.map(r=>r.total));
+  let h='';
+  h+='<div class="panel"><h2>What this class looks like to the model</h2>';
+  h+='<div class="learn-prose">'+profileProse(profile)+'</div>';
+  h+='<div class="acthint">Each bar folds <b>all</b> supporting and opposing patterns for this class into one direction per feature — high, low, or a band.</div>';
+  h+=statBars(profile.rows.slice(0,12).map(r=>({
+    name:r.name, val:r.label.split(' ')[0], pct:100*r.total/maxT,
+    color: r.kind==='hi'?'g':(r.kind==='lo'?null:'r')
+  })))+'</div>';
+  h+='<div class="actgrid">';
+  h+='<div class="panel"><h2>Features that move together</h2>';
+  h+='<div class="acthint">When the model learned patterns for <b>'+esc(profile.cls)+'</b>, these feature pairs showed up in the same learned templates most often — a sign of interaction, not isolated checks.</div>';
+  if(couples.length){
+    couples.forEach(p=>{
+      h+='<div class="couple"><b>'+esc(p.a)+'</b><span class="link">and</span><b>'+esc(p.b)+'</b>'+
+        '<span class="muted" style="margin-left:auto">co-learned</span></div>';
+    });
+  } else h+='<div class="muted">Not enough multi-feature patterns yet for this class.</div>';
+  h+='</div>';
+  h+='<div class="panel"><h2>Decision landscape</h2>';
+  if(f1 && f2){
+    h+='<div class="acthint">Fix every other feature at typical values; sweep <b>'+esc(f1)+'</b> and <b>'+esc(f2)+'</b>. Green = region where <b>'+esc(profile.cls)+'</b> wins; pink = another class wins.</div>';
+    h+='<div class="stripwrap">'+decisionStripSvg(clsIdx,f1,f2)+'</div>';
+  } else h+='<div class="muted">Need at least two active features to draw a landscape.</div>';
+  h+='</div></div>';
+  $('#learnBody').innerHTML=h;
+}
+
+// Merge ALL rules for one class into a single global signature (summary, not one literal rule).
+function buildClassGlobalSignature(clsIdx){
+  const profile=buildClassProfile(clsIdx);
+  const tree=buildClassPatternTree(clsIdx);
+  const cls=profile.cls;
+  const topFeats=profile.rows.slice(0,6);
+  const topThemes=tree.support.slice(0,4);
+  const topOppose=tree.oppose.slice(0,2);
+  // one-sentence human summary
+  let sentence='The model learned <b>'+esc(cls)+'</b> from ';
+  if(topFeats.length){
+    sentence+=topFeats.map(r=>{
+      const dir=r.kind==='hi'?'high':(r.kind==='lo'?'low':(r.kind==='band'?'mid-range':'mixed'));
+      return dir+' <b>'+esc(r.name)+'</b>';
+    }).join(', ');
+  } else sentence+='(no strong feature signal yet)';
+  sentence+='.';
+  // fingerprint chips
+  const fp=topFeats.map(r=>({
+    text:(r.kind==='hi'?'▲ high ':r.kind==='lo'?'▼ low ':r.kind==='band'?'◆ band ':'· ')+r.name,
+    kind:r.kind
+  }));
+  // simplified OR formula from themes
+  const themeParts=topThemes.map(t=>'('+esc(t.label)+(t.seconds.length?(' + '+t.seconds.slice(0,2).map(s=>esc(s.label)).join(', ')):'')+')');
+  const oppParts=topOppose.map(t=>'('+esc(t.label)+')');
+  const nPos=tree.nPos, nNeg=tree.nNeg;
+  const struct=
+    '<span class="hl">score('+esc(cls)+')</span> = '+
+    '<span class="pos">(</span>'+(themeParts.length?themeParts.join(' <span class="pos">∨</span> '):'…')+
+    '<span class="pos">)</span> − <span class="neg">(</span>'+(oppParts.length?oppParts.join(' <span class="neg">∨</span> '):'…')+
+    '<span class="neg">)</span><br>'+
+    '<span class="muted">↳ folded from '+nPos+' supporting + '+nNeg+' opposing patterns</span>';
+  return {cls, clsIdx, sentence, fp, struct, nPos, nNeg, nThemes:topThemes.length, tree};
+}
+
+// SVG tree diagram: learned representation for one class (all rules → one visual tree).
+function globalLearnedTreeSvg(clsIdx){
+  const t=buildClassPatternTree(clsIdx);
+  const support=t.support.slice(0,6);
+  const oppose=t.oppose.slice(0,4);
+  const maxChild=Math.max(0,...support.map(x=>x.seconds.length), ...oppose.map(x=>x.seconds.length));
+  const maxW=Math.max(support.length, oppose.length, 1);
+  const W=Math.max(560, maxW*118+120);
+  const H=300+maxChild*24;
+  const cx=W/2;
+  const trunc=(s,n)=>{ s=String(s); return s.length>n?s.slice(0,n-1)+'…':s; };
+  const box=(x,y,w,h,label,sub,kind)=>{
+    const fill=kind==='root'?'#1e2a45':kind==='pos'?'#16241a':kind==='neg'?'#241418':kind==='or'?'#1f2431':'#181b24';
+    const stroke=kind==='root'?'#7aa2f7':kind==='pos'?'#9ece6a':kind==='neg'?'#f7768e':kind==='or'?'#5a7a9a':'#2b3142';
+    let s='<rect x="'+x+'" y="'+y+'" width="'+w+'" height="'+h+'" rx="6" fill="'+fill+'" stroke="'+stroke+'" stroke-width="1.2"/>';
+    s+='<text x="'+(x+w/2)+'" y="'+(y+(sub?14:18))+'" text-anchor="middle" fill="#e6e8ee" font-size="12" font-weight="'+(kind==='root'?'700':'600')+'">'+esc(trunc(label,22))+'</text>';
+    if(sub) s+='<text x="'+(x+w/2)+'" y="'+(y+28)+'" text-anchor="middle" fill="#9aa3b2" font-size="10">'+esc(trunc(sub,28))+'</text>';
+    return s;
+  };
+  const edge=(x1,y1,x2,y2,col)=> '<path d="M'+x1+' '+y1+' C'+x1+' '+(y1+(y2-y1)/2)+','+x2+' '+(y1+(y2-y1)/2)+','+x2+' '+y2+'" fill="none" stroke="'+col+'" stroke-width="1.4" opacity="0.7"/>';
+  const bar=(x,y,w,pct,col)=>{
+    const bw=Math.max(4,w*pct);
+    return '<rect x="'+x+'" y="'+y+'" width="'+w+'" height="4" rx="2" fill="#2b3142"/><rect x="'+x+'" y="'+y+'" width="'+bw+'" height="4" rx="2" fill="'+col+'"/>';
+  };
+  const maxSW=Math.max(1,...support.map(x=>x.weight), ...oppose.map(x=>x.weight));
+  let s='<svg class="learned-tree-svg" viewBox="0 0 '+W+' '+H+'" preserveAspectRatio="xMidYMid meet" role="img" aria-label="Learned representation tree for '+esc(t.cls)+'">';
+  // root
+  const rw=140,rh=36; s+=box(cx-rw/2,8,rw,rh,t.cls,t.nPos+' for · '+t.nNeg+' against','root');
+  s+=edge(cx,44,cx,52,'#5a7a9a');
+  s+=box(cx-70,52,140,26,'score = FOR − AGAINST','','or');
+  s+=edge(cx,78,cx-W*0.22,98,'#9ece6a');
+  s+=edge(cx,78,cx+W*0.22,98,'#f7768e');
+  const fw=110,fh=30;
+  s+=box(cx-W*0.22-fw/2,98,fw,fh,'➕ FOR','∨ any family matches','pos');
+  s+=box(cx+W*0.22-fw/2,98,fw,fh,'➖ AGAINST','∨ any family matches','neg');
+  // theme nodes under FOR / AGAINST
+  function placeThemes(themes, centerX, y, kind){
+    const n=themes.length||1;
+    const span=Math.min(W*0.44, n*108);
+    const x0=centerX-span/2;
+    themes.forEach((th,i)=>{
+      const tw=96, thh=th.seconds.length?52:38;
+      const x=x0+(i+0.5)*(span/n)-tw/2;
+      const col=kind==='pos'?'#9ece6a':'#f7768e';
+      s+=edge(centerX,98+fh,x+tw/2,y,col);
+      s+=box(x,y,tw,thh,trunc(th.label,18),th.n+' pat · ~'+Math.round(th.weight),kind==='pos'?'leafpos':'leafneg');
+      s+=bar(x+6,y+thh-8,tw-12,th.weight/maxSW,col);
+      th.seconds.slice(0,2).forEach((sec,j)=>{
+        const ly=y+thh+14+j*22, lw=88;
+        s+=edge(x+tw/2,y+thh,x+tw/2,ly,'#5a7a9a');
+        s+=box(x+(tw-lw)/2,ly,lw,18,trunc(sec.label,16),'','leaf');
+      });
+    });
+    if(!themes.length){
+      s+=edge(centerX,98+fh,centerX,y+10,'#5a7a9a');
+      s+=box(centerX-50,y+10,100,22,'(none)','','leaf');
+    }
+  }
+  placeThemes(support, cx-W*0.22, 148, 'pos');
+  placeThemes(oppose, cx+W*0.22, 148, 'neg');
+  s+='<text x="12" y="'+(H-8)+'" fill="#9aa3b2" font-size="10">Learned representation · top = class · green = pushes up · red = pushes down</text>';
+  return s+'</svg>';
+}
+
+function renderGlobalSignatureCard(sig){
+  const fpHtml=sig.fp.map(c=>'<span class="fpchip '+esc(c.kind)+'">'+esc(c.text)+'</span>').join('')||'<span class="muted">no fingerprint yet</span>';
+  const treeSvg=globalLearnedTreeSvg(sig.clsIdx);
+  return '<div class="gsig" data-cls="'+esc(sig.cls)+'">'+
+    '<div class="gsig-hd"><div class="gtitle">'+esc(sig.cls)+'</div>'+
+    '<div class="gmeta">'+sig.nPos+' supporting · '+sig.nNeg+' opposing · merged into one tree</div></div>'+
+    '<div class="gsig-bd">'+
+      '<div class="gtree-wrap">'+treeSvg+'</div>'+
+      '<details class="gsig-details"><summary>Text summary &amp; fingerprint</summary>'+
+        '<div class="gone" style="margin-top:8px">'+sig.sentence+'</div>'+
+        '<div class="gsig-fp" style="margin-top:8px">'+fpHtml+'</div>'+
+        '<div class="gstruct" style="margin-top:8px">'+sig.struct+'</div>'+
+      '</details>'+
+    '</div></div>';
+}
+
+let globalState={query:'', focusOne:false, focusIdx:0};
+
+function setupGlobal(){
+  const sr=$('#globalSearch');
+  const fc=$('#globalFocusClass');
+  if(ENGINE && fc){
+    fc.innerHTML=ENGINE.classes.map((c,i)=>'<option value="'+i+'">'+esc(c)+'</option>').join('');
+  }
+  if(!sr || sr._wired) return;
+  sr._wired=true;
+  sr.oninput=()=>{ globalState.query=sr.value; renderGlobal(); };
+  $('#globalFocusOne').onchange=e=>{
+    globalState.focusOne=e.target.checked;
+    fc.classList.toggle('hidden', !globalState.focusOne);
+    renderGlobal();
+  };
+  fc.onchange=()=>{ globalState.focusIdx=+fc.value; renderGlobal(); };
+}
+
+function renderGlobal(){
+  if(!ENGINE || !CLAUSES.length){ $('#globalGrid').innerHTML=''; return; }
+  const q=globalState.query.trim().toLowerCase();
+  let sigs=ENGINE.classes.map((_,i)=>buildClassGlobalSignature(i))
+    .filter(s=>!q || String(s.cls).toLowerCase().includes(q));
+  if(globalState.focusOne && sigs.length){
+    const pick=ENGINE.classes[globalState.focusIdx];
+    sigs=sigs.filter(s=>String(s.cls)===String(pick));
+    if(!sigs.length) sigs=[buildClassGlobalSignature(globalState.focusIdx)];
+  }
+  $('#globalNote').textContent = COMP && COMP.clauseFire
+    ? sigs.length+' tree diagram'+(sigs.length===1?'':'s')+' · weighted from '+COMP.nSamples+' samples'
+    : sigs.length+' tree diagram'+(sigs.length===1?'':'s')+' · from rule bank';
+  $('#globalGrid').innerHTML = sigs.length
+    ? sigs.map(renderGlobalSignatureCard).join('')
+    : '<div class="panel forest-empty">No class matches.</div>';
+}
+
+// Per-sample "learning story" — themes, not rule enumeration.
+function buildSampleStory(fv, res, winIdx, winLbl){
+  const profile=buildClassProfile(winIdx);
+  const profMap={}; profile.rows.forEach(r=>{ profMap[r.name]=r; });
+  const themes={};
+  ENGINE.clauses.forEach(eng=>{
+    if(eng.clsIdx!==winIdx || eng.polarity!=='positive') return;
+    const out=res.clauseOut[eng.id].out;
+    if(!out) return;
+    const c=CLAUSES.find(x=>x.id===eng.id)||eng;
+    const conds=thermoConds(c).filter(cd=>!cd.impossible);
+    const lead = (conds.find(cd=>cd.state==='on')||conds[0]);
+    if(!lead) return;
+    const key=lead.feature;
+    if(!themes[key]) themes[key]={feat:key, pts:0, n:0, met:0, leadKind:lead.state};
+    themes[key].pts+=out; themes[key].n++;
+    const v=fv[key];
+    if(Number.isFinite(v)){
+      const ok = lead.state==='on' ? v>=lead.thr : v<lead.thr;
+      if(ok) themes[key].met++;
+    }
+  });
+  const list=Object.values(themes).sort((a,b)=>b.pts-a.pts).slice(0,5);
+  if(!list.length) return '';
+  let html='<div class="step"><div class="num">★</div><h3>What the model recognized on this sample</h3>';
+  html+='<div class="muted" style="font-size:12px;margin-bottom:8px">Grouped by <b>idea</b>, not individual rules — the same way the Learn tab summarises the whole model.</div>';
+  list.forEach(t=>{
+    const prof=profMap[t.feat];
+    const learned = prof ? prof.label : 'pattern on this feature';
+    const v=fv[t.feat];
+    const read = Number.isFinite(v)
+      ? ('Your <b>'+esc(t.feat)+'</b> = '+esc(fmtNum(v))+' — the model learned this class '+esc(learned)+'.')
+      : ('Missing reading for <b>'+esc(t.feat)+'</b>.');
+    html+='<div class="storycard"><h4>'+esc(t.feat)+'</h4>'+
+      '<div class="pts">+'+t.pts+' points from '+t.n+' matching pattern'+(t.n===1?'':'s')+'</div>'+
+      '<div class="read">'+read+'</div></div>';
+  });
+  html+='</div>';
+  return html;
+}
+
+// ===========================================================================
+//  TREES TAB — one pattern tree per class (multi-tree forest)
+// ===========================================================================
+let treeState={query:'', openAll:false};
+
+function featureDirectionLabel(feat, kind){
+  if(kind==='hi') return 'high '+feat;
+  if(kind==='lo') return 'low '+feat;
+  if(kind==='band') return feat+' in a middle band';
+  return feat;
+}
+
+function inferFeatureKindInTheme(onCount, offCount){
+  if(onCount && offCount) return 'band';
+  if(onCount >= offCount) return 'hi';
+  return 'lo';
+}
+
+// Group clauses into theme branches for one class tree.
+function buildClassPatternTree(clsIdx){
+  const cls=ENGINE.classes[clsIdx];
+  const support={}, oppose={};
+  const bucket=(map, key)=>{
+    if(!map[key]) map[key]={feat:key, weight:0, n:0, leadOn:0, leadOff:0, seconds:{}};
+    return map[key];
+  };
+  ENGINE.clauses.forEach((eng,ci)=>{
+    if(eng.clsIdx!==clsIdx) return;
+    const c=CLAUSES.find(x=>x.id===eng.id)||eng;
+    const conds=thermoConds(c).filter(cd=>!cd.impossible);
+    if(!conds.length) return;
+    const lead=(conds.find(cd=>cd.state==='on')||conds[0]);
+    const w=clauseLearnWeight(ci,c);
+    const map=eng.polarity==='positive'?support:oppose;
+    const node=bucket(map, lead.feature);
+    node.weight+=w; node.n++;
+    conds.forEach(cd=>{
+      if(cd.feature===lead.feature){
+        if(cd.state==='on') node.leadOn++; else node.leadOff++;
+        return;
+      }
+      const sk=cd.feature;
+      if(!node.seconds[sk]) node.seconds[sk]={feat:sk, weight:0, n:0, on:0, off:0};
+      const s=node.seconds[sk];
+      s.weight+=w; s.n++;
+      if(cd.state==='on') s.on++; else s.off++;
+    });
+  });
+  function finalize(map){
+    return Object.values(map).map(t=>{
+      const leadKind=inferFeatureKindInTheme(t.leadOn, t.leadOff);
+      const secs=Object.values(t.seconds).map(s=>{
+        const kind=inferFeatureKindInTheme(s.on, s.off);
+        return {...s, kind, label:featureDirectionLabel(s.feat, kind)};
+      }).sort((a,b)=>b.weight-a.weight).slice(0,4);
+      return {
+        feat:t.feat, weight:t.weight, n:t.n, kind:leadKind,
+        label:featureDirectionLabel(t.feat, leadKind), seconds:secs
+      };
+    }).sort((a,b)=>b.weight-a.weight);
+  }
+  return {
+    cls, clsIdx,
+    support: finalize(support),
+    oppose: finalize(oppose),
+    nPos: ENGINE.clauses.filter(c=>c.clsIdx===clsIdx && c.polarity==='positive').length,
+    nNeg: ENGINE.clauses.filter(c=>c.clsIdx===clsIdx && c.polarity==='negative').length
+  };
+}
+
+function renderThemeBranch(themes, pol){
+  if(!themes.length) return '<li><div class="tnode"><span class="tic">·</span><span class="tlab muted">(none learned)</span></div></li>';
+  return themes.slice(0,8).map(t=>{
+    const leafCls='leaf-'+(t.kind==='hi'?'hi':t.kind==='lo'?'lo':t.kind==='band'?'band':'opp');
+    const wt=Math.round(t.weight);
+    let sub='';
+    if(t.seconds.length){
+      sub='<div class="subfeat">often together with: '+t.seconds.map(s=>esc(s.label)).join(', ')+'</div>';
+    }
+    let kids='';
+    if(t.seconds.length){
+      kids='<ul>'+t.seconds.slice(0,3).map(s=>{
+        const sk='leaf-'+(s.kind==='hi'?'hi':s.kind==='lo'?'lo':'band');
+        return '<li><div class="tnode '+sk+'"><span class="tic">└</span><span class="tlab">'+esc(s.label)+'</span></div></li>';
+      }).join('')+'</ul>';
+    }
+    return '<li><div class="tnode '+leafCls+'"><span class="tic">'+(pol==='pos'?'▲':'▼')+'</span>'+
+      '<span class="tlab"><b>'+esc(t.label)+'</b>'+sub+'</span>'+
+      '<span class="tmeta">'+t.n+' pattern'+(t.n===1?'':'s')+' · ~'+wt+'</span></div>'+kids+'</li>';
+  }).join('')+(themes.length>8?'<li class="muted" style="font-size:12px">+'+(themes.length-8)+' more themes…</li>':'');
+}
+
+function renderOneClassTree(tree, open){
+  const extra=tree.support.length+tree.oppose.length;
+  const meta=tree.nPos+' for · '+tree.nNeg+' against · '+extra+' theme'+(extra===1?'':'s');
+  return '<div class="classtree'+(open?' open':'')+'" data-cls="'+esc(tree.cls)+'">'+
+    '<div class="classtree-hd" role="button" tabindex="0" aria-expanded="'+(open?'true':'false')+'">'+
+      '<span class="chev">▶</span>'+
+      '<span class="clsname">'+esc(tree.cls)+'</span>'+
+      '<span class="clsmeta">'+meta+'</span>'+
+    '</div>'+
+    '<div class="classtree-bd">'+
+      '<div class="troot">When a sample arrives, patterns in this tree <b>add or subtract points</b> for <b>'+esc(tree.cls)+'</b>. The winning class is whoever ends up with the highest score across <i>all</i> class trees.</div>'+
+      '<ul class="ptree">'+
+        '<li><div class="tnode branch-pos"><span class="tic">➕</span><span class="tlab"><b>Patterns that push '+esc(tree.cls)+' up</b></span></div>'+
+          '<ul>'+renderThemeBranch(tree.support,'pos')+'</ul></li>'+
+        '<li><div class="tnode branch-neg"><span class="tic">➖</span><span class="tlab"><b>Patterns that push '+esc(tree.cls)+' down</b></span></div>'+
+          '<ul>'+renderThemeBranch(tree.oppose,'neg')+'</ul></li>'+
+      '</ul></div></div>';
+}
+
+function wireTreeForest(){
+  $$('#treeForest .classtree-hd').forEach(hd=>{
+    const toggle=()=>{
+      const box=hd.closest('.classtree');
+      box.classList.toggle('open');
+      hd.setAttribute('aria-expanded', box.classList.contains('open')?'true':'false');
+    };
+    hd.onclick=toggle;
+    hd.onkeydown=e=>{ if(e.key==='Enter'||e.key===' '){ e.preventDefault(); toggle(); } };
+  });
+}
+
+function renderTrees(){
+  if(!ENGINE || !CLAUSES.length){ $('#treeForest').innerHTML=''; return; }
+  const q=treeState.query.trim().toLowerCase();
+  const trees=ENGINE.classes.map((_,i)=>buildClassPatternTree(i))
+    .filter(t=>!q || String(t.cls).toLowerCase().includes(q));
+  $('#treeCount').textContent = trees.length+' / '+ENGINE.classes.length+' class trees';
+  if(!trees.length){
+    $('#treeForest').innerHTML='<div class="forest-empty panel">No class matches “'+esc(q)+'”.</div>';
+    return;
+  }
+  const openDefault = ENGINE.classes.length<=6 || !!q;
+  $('#treeForest').innerHTML = trees.map((t,i)=>
+    renderOneClassTree(t, treeState.openAll || openDefault || i===0)
+  ).join('');
+  wireTreeForest();
+}
+
+function setupTrees(){
+  const sr=$('#treeSearch');
+  if(!sr || sr._wired) return;
+  sr._wired=true;
+  sr.oninput=()=>{ treeState.query=sr.value; renderTrees(); };
+  $('#treeExpandAll').onclick=()=>{ treeState.openAll=true; renderTrees(); treeState.openAll=false; $$('#treeForest .classtree').forEach(el=>el.classList.add('open')); };
+  $('#treeCollapseAll').onclick=()=>{ $$('#treeForest .classtree').forEach(el=>el.classList.remove('open')); };
 }
 
 // ===========================================================================
@@ -1634,6 +2294,9 @@ function showSample(i){
   const confTxt = margin>0 ? ('won by <b>'+fmtNum(margin)+'</b> points over '+esc(classes[runner.k])) : 'a very close call (tie or near-tie) with '+esc(classes[runner.k]);
   html+='<div class="muted" style="margin-top:6px;font-size:12px">'+confTxt+'</div>';
   html+='</div>';
+
+  // ---- LEARNING STORY (themes, not rules) ----
+  html+=buildSampleStory(fv, res, winIdx, winLbl);
 
   const winPos = ENGINE.clauses.filter(c=>c.clsIdx===winIdx && c.polarity==='positive' && res.clauseOut[c.id].out>0);
   const winPosFull = CLAUSES.filter(c=>winPos.some(w=>w.id===c.id));
