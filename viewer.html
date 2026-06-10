@@ -532,7 +532,7 @@
           <span class="muted">each branch merges many clauses into one human concept</span>
         </div>
         <div class="toolbar class-selector-big" style="margin-top:14px">
-          <span class="lbl">show class</span>
+          <span class="lbl">show</span>
           <select id="globalFocusClass"></select>
           <span class="muted" id="globalNote" style="font-size:12px"></span>
         </div>
@@ -1636,6 +1636,68 @@ function globalTreeDiagramSvg(tree){
   return s+'</svg>';
 }
 
+function modelWideTreeSvg(){
+  const classTrees = ENGINE.classes.map((_,i)=>buildClassPatternTree(i));
+  const classCount = classTrees.length;
+  const nodeW = 210, nodeH = 34;
+  const conceptW = 200, conceptH = 28;
+  const classGap = 36;
+  const perClassConcepts = 3;
+  const W = Math.max(1200, classCount*(nodeW+classGap)+140);
+  const H = 520;
+  const rootX = W/2;
+  const classY = 120;
+  const conceptY = 240;
+  const edge=(x1,y1,x2,y2,c,w=1.4)=>'<path d="M'+x1+' '+y1+' C'+x1+' '+((y1+y2)/2)+','+x2+' '+((y1+y2)/2)+','+x2+' '+y2+'" fill="none" stroke="'+c+'" stroke-width="'+w+'" opacity="0.82"/>';
+  const trunc=(s,n)=>{ s=String(s); return s.length>n?s.slice(0,n-1)+'…':s; };
+  let s='<svg viewBox="0 0 '+W+' '+H+'" preserveAspectRatio="xMidYMid meet" role="img" aria-label="One big tree diagram from all rules">';
+  // Root
+  s+='<rect x="'+(rootX-170)+'" y="10" width="340" height="44" rx="8" fill="#1e2a45" stroke="#7aa2f7"/>';
+  s+='<text x="'+rootX+'" y="30" text-anchor="middle" fill="#e6e8ee" font-size="14" font-weight="700">All learned rules (full model)</text>';
+  s+='<text x="'+rootX+'" y="44" text-anchor="middle" fill="#9aa3b2" font-size="10">root → classes → strongest concept families</text>';
+
+  const totalW = classCount*(nodeW+classGap)-classGap;
+  const x0 = (W-totalW)/2;
+  classTrees.forEach((ct,ci)=>{
+    const x = x0 + ci*(nodeW+classGap);
+    const cx = x + nodeW/2;
+    // edge root->class
+    s+=edge(rootX,54,cx,classY,'#5a7a9a',1.3);
+    // class node
+    s+='<rect x="'+x+'" y="'+classY+'" width="'+nodeW+'" height="'+nodeH+'" rx="7" fill="#1f2431" stroke="#7aa2f7"/>';
+    s+='<text x="'+cx+'" y="'+(classY+14)+'" text-anchor="middle" fill="#e6e8ee" font-size="11" font-weight="700">'+esc(trunc(ct.cls,24))+'</text>';
+    s+='<text x="'+cx+'" y="'+(classY+27)+'" text-anchor="middle" fill="#9aa3b2" font-size="10">'+ct.nPos+' for · '+ct.nNeg+' against</text>';
+
+    const sup = ct.support.slice(0,perClassConcepts);
+    const opp = ct.oppose.slice(0,perClassConcepts);
+    const maxLocal = Math.max(1,...sup.map(a=>a.weight),...opp.map(a=>a.weight));
+    const leftStart = cx - 10 - conceptW;
+    const rightStart = cx + 10;
+    sup.forEach((t,j)=>{
+      const y = conceptY + j*64;
+      s+=edge(cx,classY+nodeH,leftStart+conceptW/2,y,'#9ece6a',1.6);
+      s+='<rect x="'+leftStart+'" y="'+y+'" width="'+conceptW+'" height="'+conceptH+'" rx="6" fill="#16241a" stroke="#9ece6a"/>';
+      s+='<text x="'+(leftStart+8)+'" y="'+(y+14)+'" fill="#e6e8ee" font-size="10" font-weight="600">'+esc(trunc(t.label,34))+'</text>';
+      s+='<text x="'+(leftStart+8)+'" y="'+(y+24)+'" fill="#9aa3b2" font-size="9">'+t.n+' patt · '+fmtNum(Math.round(t.weight))+'</text>';
+      const bw = Math.max(5, ((conceptW-16)*t.weight)/maxLocal);
+      s+='<rect x="'+(leftStart+8)+'" y="'+(y+conceptH-3)+'" width="'+(conceptW-16)+'" height="2" rx="1.5" fill="#2b3142"/>';
+      s+='<rect x="'+(leftStart+8)+'" y="'+(y+conceptH-3)+'" width="'+bw+'" height="2" rx="1.5" fill="#9ece6a"/>';
+    });
+    opp.forEach((t,j)=>{
+      const y = conceptY + j*64;
+      s+=edge(cx,classY+nodeH,rightStart+conceptW/2,y,'#f7768e',1.6);
+      s+='<rect x="'+rightStart+'" y="'+y+'" width="'+conceptW+'" height="'+conceptH+'" rx="6" fill="#241418" stroke="#f7768e"/>';
+      s+='<text x="'+(rightStart+8)+'" y="'+(y+14)+'" fill="#e6e8ee" font-size="10" font-weight="600">'+esc(trunc(t.label,34))+'</text>';
+      s+='<text x="'+(rightStart+8)+'" y="'+(y+24)+'" fill="#9aa3b2" font-size="9">'+t.n+' patt · '+fmtNum(Math.round(t.weight))+'</text>';
+      const bw = Math.max(5, ((conceptW-16)*t.weight)/maxLocal);
+      s+='<rect x="'+(rightStart+8)+'" y="'+(y+conceptH-3)+'" width="'+(conceptW-16)+'" height="2" rx="1.5" fill="#2b3142"/>';
+      s+='<rect x="'+(rightStart+8)+'" y="'+(y+conceptH-3)+'" width="'+bw+'" height="2" rx="1.5" fill="#f7768e"/>';
+    });
+  });
+  s+='<text x="14" y="'+(H-10)+'" fill="#9aa3b2" font-size="10">One big model tree from all rules: center nodes are classes; green children support class, red children oppose class.</text>';
+  return s+'</svg>';
+}
+
 function renderGlobalSignatureCard(sig){
   const tree=sig.tree;
   const support=tree.support.slice(0,5);
@@ -1685,7 +1747,8 @@ let globalState={focusIdx:0};
 function setupGlobal(){
   const fc=$('#globalFocusClass');
   if(ENGINE && fc){
-    fc.innerHTML=ENGINE.classes.map((c,i)=>'<option value="'+i+'">'+esc(c)+'</option>').join('');
+    fc.innerHTML='<option value="-1">All classes (one big tree)</option>'+
+      ENGINE.classes.map((c,i)=>'<option value="'+i+'">'+esc(c)+'</option>').join('');
     fc.value=String(globalState.focusIdx);
   }
   if(!fc || fc._wired) return;
@@ -1695,6 +1758,14 @@ function setupGlobal(){
 
 function renderGlobal(){
   if(!ENGINE || !CLAUSES.length){ $('#globalGrid').innerHTML=''; return; }
+  if(globalState.focusIdx === -1){
+    $('#globalNote').textContent = 'full model tree from all classes and all rules';
+    $('#globalGrid').innerHTML =
+      '<div class="gsig"><div class="gsig-hd"><div class="gtitle">All classes (one big tree)</div>'+
+      '<div class="gmeta">root = full model · class nodes = outputs · child nodes = strongest learned concept families</div></div>'+
+      '<div class="gsig-bd"><div class="gtree-wrap">'+modelWideTreeSvg()+'</div></div></div>';
+    return;
+  }
   const sig=buildClassGlobalSignature(globalState.focusIdx);
   $('#globalNote').textContent = COMP && COMP.clauseFire
     ? 'weighted from '+COMP.nSamples+' loaded samples'
