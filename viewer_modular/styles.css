@@ -20,6 +20,8 @@ select{background:var(--panel2);color:var(--fg);border:1px solid var(--line);bor
 
 .repr-root{margin-bottom:14px;padding:12px;border-radius:10px;background:#172033;border:1px solid var(--acc)}
 .repr-root .name{font-size:22px;font-weight:800}
+.tree-wrap{margin:0 0 12px;border:1px solid var(--line);border-radius:10px;background:#0c0e14;overflow:auto;padding:8px}
+.tree-wrap svg{display:block;min-width:760px;height:auto}
 .repr-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
 .lane{border:1px solid var(--line);border-radius:10px;padding:10px}
 .lane.pos{border-color:#33502a;background:#111b13}

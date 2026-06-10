@@ -201,6 +201,61 @@ function buildClassTree(clsIdx) {
   };
 }
 
+function renderTreeSvg(tree) {
+  const support = tree.support.slice(0, CFG.topConcepts || 5);
+  const oppose = tree.oppose.slice(0, CFG.topConcepts || 5);
+  const colW = 280;
+  const laneGap = 90;
+  const W = colW * 2 + laneGap + 120;
+  const cx = W / 2;
+  const startY = 128;
+  const nodeH = 32;
+  const step = 54;
+  const leftX = 60;
+  const rightX = W - 60 - colW;
+  const H = Math.max(260, startY + Math.max(support.length, oppose.length, 1) * step + 30);
+  const maxW = Math.max(1, ...support.map((x) => x.weight), ...oppose.map((x) => x.weight));
+  const edge = (x1, y1, x2, y2, col) =>
+    `<path d="M${x1} ${y1} C${x1} ${Math.round((y1 + y2) / 2)},${x2} ${Math.round((y1 + y2) / 2)},${x2} ${y2}" fill="none" stroke="${col}" stroke-width="1.5" opacity="0.8"/>`;
+  const escTxt = (s, n = 34) => {
+    const t = String(s);
+    return t.length > n ? t.slice(0, n - 1) + "…" : t;
+  };
+  let s = `<svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="xMidYMid meet" role="img" aria-label="Interpretability tree for ${esc(tree.cls)}">`;
+  // root and split
+  s += `<rect x="${cx - 140}" y="8" width="280" height="40" rx="8" fill="#1e2a45" stroke="#7aa2f7"/><text x="${cx}" y="26" text-anchor="middle" fill="#e6e8ee" font-size="14" font-weight="700">${escTxt(tree.cls, 28)}</text><text x="${cx}" y="40" text-anchor="middle" fill="#9aa3b2" font-size="10">learned representation</text>`;
+  s += edge(cx, 48, cx, 68, "#5a7a9a");
+  s += `<rect x="${cx - 110}" y="68" width="220" height="28" rx="7" fill="#1f2431" stroke="#5a7a9a"/><text x="${cx}" y="86" text-anchor="middle" fill="#c7cfdd" font-size="11">score = support − opposition</text>`;
+  s += edge(cx, 96, leftX + colW / 2, startY - 16, "#9ece6a");
+  s += edge(cx, 96, rightX + colW / 2, startY - 16, "#f7768e");
+  s += `<text x="${leftX + colW / 2}" y="${startY - 22}" text-anchor="middle" fill="#9ece6a" font-size="11">support branch</text>`;
+  s += `<text x="${rightX + colW / 2}" y="${startY - 22}" text-anchor="middle" fill="#f7768e" font-size="11">opposition branch</text>`;
+
+  const drawLane = (arr, x, tone) => {
+    if (!arr.length) {
+      s += `<rect x="${x}" y="${startY}" width="${colW}" height="${nodeH}" rx="7" fill="#181b24" stroke="#2b3142"/><text x="${x + 10}" y="${startY + 20}" fill="#9aa3b2" font-size="11">no strong concepts</text>`;
+      return;
+    }
+    arr.forEach((c, i) => {
+      const y = startY + i * step;
+      const col = tone === "pos" ? "#9ece6a" : "#f7768e";
+      const fill = tone === "pos" ? "#16241a" : "#241418";
+      const sourceX = tone === "pos" ? leftX + colW / 2 : rightX + colW / 2;
+      s += edge(sourceX, startY - 16, x + colW / 2, y, col);
+      s += `<rect x="${x}" y="${y}" width="${colW}" height="${nodeH}" rx="7" fill="${fill}" stroke="${col}"/>`;
+      s += `<text x="${x + 8}" y="${y + 14}" fill="#e6e8ee" font-size="11" font-weight="600">${escTxt(c.label, 40)}</text>`;
+      s += `<text x="${x + 8}" y="${y + 26}" fill="#9aa3b2" font-size="10">${c.n} patterns · strength ${fmtNum(Math.round(c.weight))}</text>`;
+      const bw = Math.max(6, ((colW - 16) * c.weight) / maxW);
+      s += `<rect x="${x + 8}" y="${y + nodeH - 4}" width="${colW - 16}" height="3" rx="2" fill="#2b3142"/><rect x="${x + 8}" y="${y + nodeH - 4}" width="${bw}" height="3" rx="2" fill="${col}"/>`;
+    });
+  };
+  drawLane(support, leftX, "pos");
+  drawLane(oppose, rightX, "neg");
+  s += `<text x="12" y="${H - 8}" fill="#9aa3b2" font-size="10">Top node: class · left: evidence for class · right: evidence against class</text>`;
+  s += `</svg>`;
+  return s;
+}
+
 function renderTabs() {
   $$(".tabs button").forEach((b) => {
     b.classList.toggle("active", b.dataset.tab === state.activeTab);
@@ -224,6 +279,7 @@ function renderRepresentation() {
       <div class="name">${esc(tree.cls)}</div>
       <div class="muted">Model combines supporting evidence and subtracts opposing evidence.</div>
     </div>
+    <div class="tree-wrap">${renderTreeSvg(tree)}</div>
     <div class="repr-grid">
       <div class="lane pos">
         <h3>What the model looks for</h3>

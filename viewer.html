@@ -1588,6 +1588,50 @@ function conceptCard(theme, tone){
   '</div>';
 }
 
+function globalTreeDiagramSvg(tree){
+  const support=tree.support.slice(0,5);
+  const oppose=tree.oppose.slice(0,5);
+  const W=980, H=Math.max(280, 150 + Math.max(support.length, oppose.length)*54);
+  const cx=W/2, leftX=70, rightX=560, colW=350, nodeH=34, startY=118;
+  const maxW=Math.max(1,...support.map(t=>t.weight),...oppose.map(t=>t.weight));
+  const trunc=(s,n)=>{ s=String(s); return s.length>n?s.slice(0,n-1)+'…':s; };
+  const edge=(x1,y1,x2,y2,c)=>'<path d="M'+x1+' '+y1+' C'+x1+' '+((y1+y2)/2)+','+x2+' '+((y1+y2)/2)+','+x2+' '+y2+'" fill="none" stroke="'+c+'" stroke-width="1.5" opacity="0.8"/>';
+  let s='<svg viewBox="0 0 '+W+' '+H+'" preserveAspectRatio="xMidYMid meet" role="img" aria-label="Tree diagram for '+esc(tree.cls)+'">';
+  s+='<rect x="'+(cx-150)+'" y="8" width="300" height="42" rx="8" fill="#1e2a45" stroke="#7aa2f7"/>';
+  s+='<text x="'+cx+'" y="27" text-anchor="middle" fill="#e6e8ee" font-size="14" font-weight="700">'+esc(trunc(tree.cls,28))+'</text>';
+  s+='<text x="'+cx+'" y="41" text-anchor="middle" fill="#9aa3b2" font-size="10">learned representation</text>';
+  s+=edge(cx,50,cx,66,'#5a7a9a');
+  s+='<rect x="'+(cx-120)+'" y="66" width="240" height="28" rx="7" fill="#1f2431" stroke="#5a7a9a"/>';
+  s+='<text x="'+cx+'" y="84" text-anchor="middle" fill="#c7cfdd" font-size="11">score = support − opposition</text>';
+  s+=edge(cx,94,leftX+colW/2,startY-12,'#9ece6a');
+  s+=edge(cx,94,rightX+colW/2,startY-12,'#f7768e');
+  s+='<text x="'+(leftX+colW/2)+'" y="'+(startY-18)+'" text-anchor="middle" fill="#9ece6a" font-size="11">support branch</text>';
+  s+='<text x="'+(rightX+colW/2)+'" y="'+(startY-18)+'" text-anchor="middle" fill="#f7768e" font-size="11">opposition branch</text>';
+  const draw=(arr,x,tone)=>{
+    const col=tone==='pos'?'#9ece6a':'#f7768e';
+    const fill=tone==='pos'?'#16241a':'#241418';
+    if(!arr.length){
+      s+='<rect x="'+x+'" y="'+startY+'" width="'+colW+'" height="'+nodeH+'" rx="7" fill="#181b24" stroke="#2b3142"/>';
+      s+='<text x="'+(x+10)+'" y="'+(startY+21)+'" fill="#9aa3b2" font-size="11">no strong concepts</text>';
+      return;
+    }
+    arr.forEach((t,i)=>{
+      const y=startY+i*54;
+      const src=tone==='pos'?(leftX+colW/2):(rightX+colW/2);
+      s+=edge(src,startY-12,x+colW/2,y,col);
+      s+='<rect x="'+x+'" y="'+y+'" width="'+colW+'" height="'+nodeH+'" rx="7" fill="'+fill+'" stroke="'+col+'"/>';
+      s+='<text x="'+(x+8)+'" y="'+(y+14)+'" fill="#e6e8ee" font-size="11" font-weight="600">'+esc(trunc(t.label,52))+'</text>';
+      s+='<text x="'+(x+8)+'" y="'+(y+27)+'" fill="#9aa3b2" font-size="10">'+t.n+' patterns · strength '+fmtNum(Math.round(t.weight))+'</text>';
+      const bw=Math.max(6, ((colW-16)*t.weight)/maxW);
+      s+='<rect x="'+(x+8)+'" y="'+(y+nodeH-4)+'" width="'+(colW-16)+'" height="3" rx="2" fill="#2b3142"/>';
+      s+='<rect x="'+(x+8)+'" y="'+(y+nodeH-4)+'" width="'+bw+'" height="3" rx="2" fill="'+col+'"/>';
+    });
+  };
+  draw(support,leftX,'pos'); draw(oppose,rightX,'neg');
+  s+='<text x="12" y="'+(H-8)+'" fill="#9aa3b2" font-size="10">Top node = class · left = evidence for class · right = evidence against class</text>';
+  return s+'</svg>';
+}
+
 function renderGlobalSignatureCard(sig){
   const tree=sig.tree;
   const support=tree.support.slice(0,5);
@@ -1599,10 +1643,12 @@ function renderGlobalSignatureCard(sig){
     ? oppose.map(t=>conceptCard(t,'bad')).join('')
     : '<div class="muted">No strong opposing concepts found.</div>';
   const fpHtml=sig.fp.map(c=>'<span class="fpchip '+esc(c.kind)+'">'+esc(c.text)+'</span>').join('')||'<span class="muted">no fingerprint yet</span>';
+  const treeSvg=globalTreeDiagramSvg(tree);
   return '<div class="gsig" data-cls="'+esc(sig.cls)+'">'+
     '<div class="gsig-hd"><div class="gtitle">'+esc(sig.cls)+'</div>'+
     '<div class="gmeta">'+sig.nPos+' supporting clauses · '+sig.nNeg+' opposing clauses · merged into human concepts</div></div>'+
     '<div class="gsig-bd">'+
+      '<div class="gtree-wrap">'+treeSvg+'</div>'+
       '<div class="concept-tree">'+
         '<div class="concept-root">'+
           '<div class="eyebrow">learned representation</div>'+
