@@ -402,8 +402,8 @@
       <button data-tab="encoding">Encoding</button>
       <button data-tab="clauses">Rules</button>
       <button data-tab="global">Learned Representation</button>
-      <button data-tab="activity">Activity</button>
-      <button data-tab="predictions">Explain</button>
+      <button data-tab="activity">Model Behavior</button>
+      <button data-tab="predictions">Why This Prediction</button>
     </div>
 
     <!-- OVERVIEW -->
@@ -482,9 +482,9 @@
         <details id="contraExplain">
           <summary><span class="warn">⚠ Why do some rules look contradictory?</span> <span class="muted" id="contraCount"></span></summary>
           <div style="margin-top:8px;font-size:13px;line-height:1.6;color:var(--mut);max-width:880px">
-            <p style="margin:0 0 8px">Some rules ask for one feature to be both <b class="pos">ON</b> (≥ a threshold) <b>and</b> <b class="neg">OFF</b> (below it) at the same time — e.g. <span class="mono">Temp ≥ 27.27 AND Temp &lt; 27.27</span>. No value can satisfy that, so the viewer flags it <span class="badge warn">has impossible condition</span>. <b>This is expected, not a bug or a data error.</b> Here is why a Fuzzy-Pattern Tsetlin Machine produces them:</p>
+            <p style="margin:0 0 8px">Some rules ask for one feature to be both <b class="pos">above</b> and <b class="neg">below</b> related thresholds at the same time — e.g. <span class="mono">Temp ≥ 27.27 AND Temp &lt; 27.27</span>. No value can satisfy that, so the viewer flags it <span class="badge warn">has impossible condition</span>. <b>This is expected, not a bug or a data error.</b> Here is why a Fuzzy-Pattern Tsetlin Machine produces them:</p>
             <ul style="margin:0 0 8px;padding-left:20px">
-              <li><b>Each condition is learned independently.</b> Every literal (one threshold bit) is decided by its own little learner (a Tsetlin automaton) that only chooses “use this bit” / “don’t” for <i>its own</i> bit. Nothing coordinates two bits of the same feature, so occasionally both the “≥ t” bit and the “not ≥ t” bit get switched on.</li>
+              <li><b>Each condition is learned independently.</b> Every literal (one threshold bit) is decided by its own little learner (a Tsetlin automaton) that only chooses “use this bit” / “don’t” for <i>its own</i> bit. Nothing coordinates two bits of the same feature, so occasionally both “above threshold” and “below threshold” conditions survive together.</li>
               <li><b>A contradiction is nearly free here.</b> A rule does not need <i>every</i> condition to hold. It starts with a tolerance budget (the <span class="mono">clamp</span>) and just loses one point per unmet condition: <span class="mono">vote = max(clamp − misses, 0)</span>. A rule with ~50 conditions and a clamp of 8–15 barely notices one always-failing pair, so training has little pressure to remove it.</li>
               <li><b>It’s leftover “noise”, and it’s harmless.</b> The impossible pair simply costs that rule 1 point on every sample; the rest of the rule still does the real work. The model’s predictions are exactly correct — these are just untidy literals.</li>
             </ul>
@@ -565,10 +565,10 @@
     <!-- ACTIVITY -->
     <section id="tab-activity" class="hidden">
       <div class="panel" id="actEmpty">
-        <h2>Rule &amp; feature activity</h2>
-        <p class="muted">This tab shows <b>which features the model leans on most</b>, <b>how many rules fire</b>,
-          and <b>which exact rules fire most often</b> — measured by actually running the model over your samples.
-          Load a samples CSV (Explain tab) and it fills in automatically. A static view (from the rule bank alone)
+        <h2>Model behavior overview</h2>
+        <p class="muted">This tab shows, in simple order, <b>what the model uses most</b>, <b>how active the model is</b>,
+          and <b>how behavior is split by class</b> — measured by running the model on your loaded samples.
+          Load a samples CSV (Why This Prediction tab) and it fills in automatically. A static view (from the rule bank alone)
           is shown until then.</p>
       </div>
       <div id="actBody"></div>
@@ -577,7 +577,7 @@
     <!-- PREDICTIONS / EXPLAIN -->
     <section id="tab-predictions" class="hidden">
       <div class="panel" id="predEmpty">
-        <h2>Explain classifications</h2>
+        <h2>Why this prediction</h2>
         <p class="muted">Load a CSV of samples (raw feature values, one row per sample) and the viewer
           will <b>re-run the model right here in your browser</b> — no server or Python needed — then let you
           click any sample to see, in plain language, exactly why it landed in its class.</p>
@@ -604,8 +604,8 @@
             <div class="pager" id="predPager"></div>
           </div>
           <div class="panel" id="predDetail">
-            <h2>Decision path</h2>
-            <p class="muted">Click a sample on the left to trace its classification.</p>
+            <h2>Prediction explanation</h2>
+            <p class="muted">Click a sample on the left to see: main reason, key evidence, score comparison, and why alternatives lost.</p>
           </div>
         </div>
       </div>
@@ -1947,26 +1947,26 @@ function renderActivity(){
   const avgFired=(COMP.sumFired/N).toFixed(1);
   let h='';
   h+='<div class="panel">'+
-     '<h2>Activity overview <span class="muted" style="text-transform:none;font-weight:400">— measured over '+N+' samples</span></h2>'+
+     '<h2>1) Overall behavior <span class="muted" style="text-transform:none;font-weight:400">— measured over '+N+' samples</span></h2>'+
      '<div class="grid" style="margin-bottom:6px">'+
        '<div class="kv"><div class="k">total rules</div><div class="v">'+CLAUSES.length+'</div></div>'+
        '<div class="kv"><div class="k">rules that ever fire</div><div class="v">'+(CLAUSES.length-nNeverFire)+' / '+CLAUSES.length+'</div></div>'+
        '<div class="kv"><div class="k">avg rules firing / sample</div><div class="v">'+avgFired+'</div></div>'+
        '<div class="kv"><div class="k">never-firing rules</div><div class="v">'+nNeverFire+'</div></div>'+
      '</div>'+
-     '<div class="acthint">A small set of features driving most rules is normal for a Tsetlin machine — these are its most-relied-upon signals.</div>'+
+     '<div class="acthint">Read this top-down: first overall behavior, then key features, then class split, then advanced frequent patterns.</div>'+
      '</div>';
   h+='<div class="actgrid">';
-  h+='<div class="panel"><h2>Most-relied-upon features</h2>'+
-     '<div class="acthint">how often a <b>firing</b> rule used each feature (share of samples). The top few are what the model mostly classifies on.</div>'+
+  h+='<div class="panel"><h2>2) Key features used most</h2>'+
+     '<div class="acthint">How often each feature appears in patterns that matched your data.</div>'+
      statBars(featTop)+ (featRows.length>15?'<div class="muted" style="font-size:11px;margin-top:4px">showing top 15 of '+featRows.length+' used features</div>':'') +'</div>';
-  h+='<div class="panel"><h2>Most-firing rules</h2>'+
-     '<div class="acthint">the exact rules that fire most often (green = supports its class, amber = argues against). Share of samples where each fires.</div>'+
-     statBars(topClauses)+'</div>';
-  h+='</div>';
-  h+='<div class="panel"><h2>Rules by class</h2>'+
-     '<div class="acthint">how the rule bank is split across classes, and how much each class’s rules fired on your samples.</div>'+
+  h+='<div class="panel"><h2>3) Class-level activity</h2>'+
+     '<div class="acthint">How much each class contributes and how often its patterns are active.</div>'+
      classWiseTable(fireByClass)+'</div>';
+  h+='</div>';
+  h+='<details class="panel" style="margin-top:10px"><summary style="cursor:pointer">4) Advanced: most-frequent individual patterns</summary>'+
+     '<div class="acthint" style="margin-top:8px">These are exact learned patterns that matched most often (green supports class, amber opposes class).</div>'+
+     statBars(topClauses)+'</details>';
   $('#actBody').innerHTML=h;
 }
 
@@ -1981,10 +1981,10 @@ function renderActivityStatic(){
   const maxU=Math.max(1,...rows.map(r=>r.c));
   const featTop=rows.slice(0,15).map(r=>({name:r.name,val:r.c+' rules',pct:100*r.c/maxU}));
   let h='<div class="actgrid">';
-  h+='<div class="panel"><h2>Features used by the rule bank</h2>'+
-     '<div class="acthint">how many rules reference each feature (load a samples CSV to see real firing rates).</div>'+
+  h+='<div class="panel"><h2>1) Features used in the model</h2>'+
+     '<div class="acthint">How often each feature appears in learned patterns (load a samples CSV for data-driven behavior).</div>'+
      statBars(featTop)+(rows.length>15?'<div class="muted" style="font-size:11px;margin-top:4px">showing top 15 of '+rows.length+'</div>':'')+'</div>';
-  h+='<div class="panel"><h2>Rules by class</h2>'+classWiseTable(null)+'</div>';
+  h+='<div class="panel"><h2>2) Class-level pattern split</h2>'+classWiseTable(null)+'</div>';
   h+='</div>';
   $('#actBody').innerHTML=h;
 }
@@ -2311,7 +2311,7 @@ function showSample(i){
   const winPosFull = CLAUSES.filter(c=>winPos.some(w=>w.id===c.id));
 
   // ---- STEP 1: the decision-flow diagram (readings → rules → class vote) ----
-  html+='<div class="step"><div class="num">1</div><h3>How the model decided (simple flow)</h3>';
+  html+='<div class="step"><div class="num">1</div><h3>Decision flow</h3>';
   html+='<div class="muted" style="font-size:12px;margin-bottom:4px">Input values activate learned patterns. Those patterns vote for classes. The class with the most points wins.</div>';
   html+=flowDiagramSvg(fv, res, winIdx, runner.k!==winIdx?runner.k:null, classes);
   html+='<div class="leg"><span><i style="background:#3a4a6a"></i> reading → rule</span><span><i style="background:var(--pos)"></i> rule → class (thicker = more points)</span><span><i style="background:#1a2417;border:1px solid var(--pos)"></i> winning class</span></div>';
@@ -2334,7 +2334,7 @@ function showSample(i){
   const keyFeats=new Set();
   winPosFull.forEach(c=>(c.featureBands||[]).forEach(b=>keyFeats.add(b.feature)));
   const keyList=[...keyFeats];
-  html+='<div class="step"><div class="num">3</div><h3>Key input values used in this decision</h3>';
+  html+='<div class="step"><div class="num">3</div><h3>Key input values</h3>';
   if(keyList.length){
     html+='<div class="muted" style="font-size:12px;margin-bottom:4px">These values were referenced by the winning evidence patterns:</div>';
     html+='<div>'+keyList.slice(0,16).map(f=>'<span class="feat-key">'+esc(f)+' <span class="fv">'+esc(fmtNum(fv[f]))+'</span></span>').join('')+'</div>';
@@ -2344,7 +2344,7 @@ function showSample(i){
 
   // ---- STEP 3: how the classes scored (SVG diverging vote chart) ----
   const showN=Math.min(TOP_CLASSES, ranked.length);
-  html+='<div class="step"><div class="num">4</div><h3>Scoreboard: winner vs other classes</h3>';
+  html+='<div class="step"><div class="num">4</div><h3>Scoreboard (all classes)</h3>';
   html+='<div class="muted" style="font-size:12px;margin-bottom:4px">Right/green means support. Left/red means opposition. The highest final score wins.</div>';
   html+='<div id="scoreBars">'+voteChartSvg(ranked.slice(0,showN), classes, winIdx, runner.k)+'</div>';
   if(ranked.length>showN) html+='<button class="linklike" id="moreScores">show all '+ranked.length+' classes…</button>';
@@ -2352,7 +2352,7 @@ function showSample(i){
 
   // ---- why the winner ----
   const winCards = winPosFull.map(c=>({c,out:res.clauseOut[c.id].out})).sort((a,b)=>b.out-a.out);
-  html+='<div class="step"><div class="num">5</div><h3>Detailed breakdown for '+esc(winLbl)+'</h3>';
+  html+='<div class="step"><div class="num">5</div><h3>Advanced details for '+esc(winLbl)+'</h3>';
   if(winCards.length){
     html+='<div class="muted" style="font-size:12px;margin-bottom:6px">'+winCards.length+' supporting pattern'+(winCards.length===1?'':'s')+' matched this row. Top patterns:</div>';
     html+='<div class="muted" style="font-size:11px;margin-bottom:4px">In the first card, each gauge shows your value against the learned threshold.</div>';
@@ -2365,7 +2365,7 @@ function showSample(i){
   const winNeg = CLAUSES.filter(c=>String(c.class)===winLbl && c.polarity==='negative' && res.clauseOut[c.id].out>0)
                         .map(c=>({c,out:res.clauseOut[c.id].out})).sort((a,b)=>b.out-a.out);
   if(winNeg.length){
-    html+='<details style="margin-top:8px"><summary>'+winNeg.length+' opposing pattern'+(winNeg.length===1?'':'s')+' also fired (advanced)</summary><div style="margin-top:6px">'+
+    html+='<details style="margin-top:8px"><summary>'+winNeg.length+' opposing pattern'+(winNeg.length===1?'':'s')+' also fired</summary><div style="margin-top:6px">'+
       winNeg.slice(0,TOP_RULES).map(o=>ruleCard(o.c,fv,o.out,false)).join('')+'</div></details>';
   }
   html+='</div>';
@@ -2399,7 +2399,7 @@ function showSample(i){
 
   const replay = ANIMATE ? ' <button class="linklike" id="replayFlow" title="play the flow again">▶ replay</button>' : '';
   $('#predDetail').classList.toggle('flow', ANIMATE);
-  $('#predDetail').innerHTML='<h2>Decision path'+replay+'</h2>'+html;
+  $('#predDetail').innerHTML='<h2>Prediction explanation'+replay+'</h2>'+html;
   // wire progressive-disclosure buttons
   if($('#moreFiredWin')) $('#moreFiredWin').onclick=()=>{ $('#firedRules').innerHTML=firedRulesHtml(firedWin, winLbl, classes); $('#moreFiredWin').remove(); };
   if($('#moreScores')) $('#moreScores').onclick=()=>{ $('#scoreBars').innerHTML=voteChartSvg(ranked, classes, winIdx, runner.k); $('#moreScores').remove(); };
