@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>TsetlinLab Modular Viewer</title>
+  <link rel="stylesheet" href="./styles.css" />
+</head>
+<body>
+  <header class="topbar">
+    <h1>TsetlinLab <span>Modular Viewer</span></h1>
+    <div class="loaders">
+      <label class="btn">Load atlas JSON<input id="atlasFile" type="file" accept=".json,application/json" hidden /></label>
+      <label class="btn">Load samples CSV<input id="csvFile" type="file" accept=".csv,text/csv" hidden /></label>
+    </div>
+  </header>
+
+  <main class="wrap">
+    <section id="status" class="panel muted">Load an atlas JSON to start.</section>
+
+    <section id="app" class="hidden">
+      <nav class="tabs">
+        <button data-tab="repr" class="active">Learned Representation</button>
+        <button data-tab="behavior">Model Behavior</button>
+        <button data-tab="why">Why This Prediction</button>
+      </nav>
+
+      <section id="tab-repr" class="panel">
+        <div class="row">
+          <label>Class</label>
+          <select id="reprClass"></select>
+        </div>
+        <div id="reprTree"></div>
+      </section>
+
+      <section id="tab-behavior" class="panel hidden">
+        <div id="behaviorContent"></div>
+      </section>
+
+      <section id="tab-why" class="panel hidden">
+        <div id="whyEmpty" class="muted">Load a CSV to enable per-sample explanations.</div>
+        <div id="whyContent" class="hidden">
+          <div class="split">
+            <div>
+              <table id="sampleTable">
+                <thead></thead>
+                <tbody></tbody>
+              </table>
+            </div>
+            <div id="sampleExplain"></div>
+          </div>
+        </div>
+      </section>
+    </section>
+  </main>
+
+  <script src="./config.js"></script>
+  <script src="./app.js"></script>
+</body>
+</html>
