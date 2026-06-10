@@ -302,6 +302,33 @@
   .gsig-fp .fpchip.hi{border-color:#33502a;color:var(--pos)}
   .gsig-fp .fpchip.lo{border-color:#33415e;color:var(--acc)}
   .gsig-fp .fpchip.band{border-color:#5a4a26;color:var(--warn)}
+  .concept-tree{background:#0c0e14;border:1px solid var(--line);border-radius:12px;padding:18px;overflow:auto}
+  .concept-root{max-width:560px;margin:0 auto 18px;text-align:center;background:linear-gradient(180deg,#1e2a45,#172033);border:1px solid var(--acc);border-radius:12px;padding:14px 18px;box-shadow:0 0 0 1px rgba(122,162,247,.12)}
+  .concept-root .eyebrow{font-size:11px;color:var(--mut);text-transform:uppercase;letter-spacing:.08em}
+  .concept-root .main{font-size:21px;font-weight:800;margin:3px 0}
+  .concept-root .plain{font-size:13px;color:var(--mut)}
+  .concept-split{display:grid;grid-template-columns:1fr 1fr;gap:18px;position:relative}
+  .concept-split::before{content:"";position:absolute;left:50%;top:-18px;width:1px;height:18px;background:var(--line)}
+  .concept-lane{border:1px solid var(--line);border-radius:12px;background:var(--panel);padding:12px;position:relative}
+  .concept-lane::before{content:"";position:absolute;top:-19px;height:18px;width:50%;border-top:1px solid var(--line)}
+  .concept-lane.good::before{right:0;border-left:1px solid var(--line);border-top-left-radius:10px}
+  .concept-lane.bad::before{left:0;border-right:1px solid var(--line);border-top-right-radius:10px}
+  .concept-lane.good{border-color:#33502a;background:#111b13}
+  .concept-lane.bad{border-color:#5a2630;background:#1b1114}
+  .lane-title{display:flex;gap:8px;align-items:center;font-size:15px;font-weight:800;margin-bottom:4px}
+  .lane-title.good{color:var(--pos)} .lane-title.bad{color:var(--neg)}
+  .lane-help{font-size:12px;color:var(--mut);margin-bottom:10px}
+  .concept-card{position:relative;margin:10px 0 10px 18px;border:1px solid var(--line);border-radius:10px;background:var(--panel2);padding:10px 12px}
+  .concept-card::before{content:"";position:absolute;left:-18px;top:20px;width:18px;border-top:1px solid var(--line)}
+  .concept-card.good{border-color:#33502a}.concept-card.bad{border-color:#5a2630}
+  .concept-card .ctitle{font-size:15px;font-weight:800;margin-bottom:2px}
+  .concept-card.good .ctitle{color:var(--pos)} .concept-card.bad .ctitle{color:var(--neg)}
+  .concept-card .cmeta{font-size:12px;color:var(--mut);margin-bottom:7px}
+  .cochips{display:flex;flex-wrap:wrap;gap:5px}
+  .cochip{font-size:11px;border:1px solid var(--line);border-radius:999px;padding:2px 8px;background:var(--chip);color:var(--mut)}
+  .class-selector-big{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+  .class-selector-big select{min-width:220px;font-weight:700;color:var(--fg)}
+  @media (max-width:900px){.concept-split{grid-template-columns:1fr}.concept-split::before,.concept-lane::before{display:none}}
   /* ---- Encoding tab: one feature -> bits -> literals ---- */
   .enctoolbar{display:flex;gap:14px;align-items:center;flex-wrap:wrap;margin-bottom:10px}
   .encval{font-size:22px;font-weight:700;color:var(--acc);font-variant-numeric:tabular-nums}
@@ -374,9 +401,7 @@
       <button data-tab="bits">Bits</button>
       <button data-tab="encoding">Encoding</button>
       <button data-tab="clauses">Rules</button>
-      <button data-tab="learn">Learn</button>
-      <button data-tab="global">Global</button>
-      <button data-tab="trees">Trees</button>
+      <button data-tab="global">Learned Representation</button>
       <button data-tab="activity">Activity</button>
       <button data-tab="predictions">Explain</button>
     </div>
@@ -500,17 +525,15 @@
     <section id="tab-global" class="hidden">
       <div class="panel">
         <h2>Visualization of learned representations</h2>
-        <p class="learn-intro">Each class has many learned patterns. This tab draws a <b>tree diagram</b> per class — all rules folded into one visual structure: root → vote → FOR / AGAINST branches → theme families → co-features. Read the diagram top-down; bar width = learning strength.</p>
+        <p class="learn-intro">This view answers one question: <b>what did the Tsetlin Machine learn for this class?</b> It folds all clauses into a simple concept tree: the green side shows what the model looks for, the red side shows what pushes the class away, and small chips show feature interactions learned together.</p>
         <div class="forest-legend" style="margin-top:10px">
-          <span><i class="dot pos"></i> ➕ supporting branch</span>
-          <span><i class="dot neg"></i> ➖ opposing branch</span>
-          <span class="muted">∨ = any matching family adds points</span>
+          <span><i class="dot pos"></i> green = evidence the model learned for this class</span>
+          <span><i class="dot neg"></i> red = evidence that argues against this class</span>
+          <span class="muted">each branch merges many clauses into one human concept</span>
         </div>
-        <div class="toolbar" style="margin-top:14px">
-          <span class="lbl">find class</span>
-          <input type="search" id="globalSearch" placeholder="class name…" style="min-width:200px">
-          <label><input type="checkbox" id="globalFocusOne"> focus one class</label>
-          <select id="globalFocusClass" class="hidden" style="min-width:160px"></select>
+        <div class="toolbar class-selector-big" style="margin-top:14px">
+          <span class="lbl">show learned representation for</span>
+          <select id="globalFocusClass"></select>
           <span class="muted" id="globalNote" style="font-size:12px"></span>
         </div>
       </div>
@@ -1553,79 +1576,53 @@ function buildClassGlobalSignature(clsIdx){
   return {cls, clsIdx, sentence, fp, struct, nPos, nNeg, nThemes:topThemes.length, tree};
 }
 
-// SVG tree diagram: learned representation for one class (all rules → one visual tree).
-function globalLearnedTreeSvg(clsIdx){
-  const t=buildClassPatternTree(clsIdx);
-  const support=t.support.slice(0,6);
-  const oppose=t.oppose.slice(0,4);
-  const maxChild=Math.max(0,...support.map(x=>x.seconds.length), ...oppose.map(x=>x.seconds.length));
-  const maxW=Math.max(support.length, oppose.length, 1);
-  const W=Math.max(560, maxW*118+120);
-  const H=300+maxChild*24;
-  const cx=W/2;
-  const trunc=(s,n)=>{ s=String(s); return s.length>n?s.slice(0,n-1)+'…':s; };
-  const box=(x,y,w,h,label,sub,kind)=>{
-    const fill=kind==='root'?'#1e2a45':kind==='pos'?'#16241a':kind==='neg'?'#241418':kind==='or'?'#1f2431':'#181b24';
-    const stroke=kind==='root'?'#7aa2f7':kind==='pos'?'#9ece6a':kind==='neg'?'#f7768e':kind==='or'?'#5a7a9a':'#2b3142';
-    let s='<rect x="'+x+'" y="'+y+'" width="'+w+'" height="'+h+'" rx="6" fill="'+fill+'" stroke="'+stroke+'" stroke-width="1.2"/>';
-    s+='<text x="'+(x+w/2)+'" y="'+(y+(sub?14:18))+'" text-anchor="middle" fill="#e6e8ee" font-size="12" font-weight="'+(kind==='root'?'700':'600')+'">'+esc(trunc(label,22))+'</text>';
-    if(sub) s+='<text x="'+(x+w/2)+'" y="'+(y+28)+'" text-anchor="middle" fill="#9aa3b2" font-size="10">'+esc(trunc(sub,28))+'</text>';
-    return s;
-  };
-  const edge=(x1,y1,x2,y2,col)=> '<path d="M'+x1+' '+y1+' C'+x1+' '+(y1+(y2-y1)/2)+','+x2+' '+(y1+(y2-y1)/2)+','+x2+' '+y2+'" fill="none" stroke="'+col+'" stroke-width="1.4" opacity="0.7"/>';
-  const bar=(x,y,w,pct,col)=>{
-    const bw=Math.max(4,w*pct);
-    return '<rect x="'+x+'" y="'+y+'" width="'+w+'" height="4" rx="2" fill="#2b3142"/><rect x="'+x+'" y="'+y+'" width="'+bw+'" height="4" rx="2" fill="'+col+'"/>';
-  };
-  const maxSW=Math.max(1,...support.map(x=>x.weight), ...oppose.map(x=>x.weight));
-  let s='<svg class="learned-tree-svg" viewBox="0 0 '+W+' '+H+'" preserveAspectRatio="xMidYMid meet" role="img" aria-label="Learned representation tree for '+esc(t.cls)+'">';
-  // root
-  const rw=140,rh=36; s+=box(cx-rw/2,8,rw,rh,t.cls,t.nPos+' for · '+t.nNeg+' against','root');
-  s+=edge(cx,44,cx,52,'#5a7a9a');
-  s+=box(cx-70,52,140,26,'score = FOR − AGAINST','','or');
-  s+=edge(cx,78,cx-W*0.22,98,'#9ece6a');
-  s+=edge(cx,78,cx+W*0.22,98,'#f7768e');
-  const fw=110,fh=30;
-  s+=box(cx-W*0.22-fw/2,98,fw,fh,'➕ FOR','∨ any family matches','pos');
-  s+=box(cx+W*0.22-fw/2,98,fw,fh,'➖ AGAINST','∨ any family matches','neg');
-  // theme nodes under FOR / AGAINST
-  function placeThemes(themes, centerX, y, kind){
-    const n=themes.length||1;
-    const span=Math.min(W*0.44, n*108);
-    const x0=centerX-span/2;
-    themes.forEach((th,i)=>{
-      const tw=96, thh=th.seconds.length?52:38;
-      const x=x0+(i+0.5)*(span/n)-tw/2;
-      const col=kind==='pos'?'#9ece6a':'#f7768e';
-      s+=edge(centerX,98+fh,x+tw/2,y,col);
-      s+=box(x,y,tw,thh,trunc(th.label,18),th.n+' pat · ~'+Math.round(th.weight),kind==='pos'?'leafpos':'leafneg');
-      s+=bar(x+6,y+thh-8,tw-12,th.weight/maxSW,col);
-      th.seconds.slice(0,2).forEach((sec,j)=>{
-        const ly=y+thh+14+j*22, lw=88;
-        s+=edge(x+tw/2,y+thh,x+tw/2,ly,'#5a7a9a');
-        s+=box(x+(tw-lw)/2,ly,lw,18,trunc(sec.label,16),'','leaf');
-      });
-    });
-    if(!themes.length){
-      s+=edge(centerX,98+fh,centerX,y+10,'#5a7a9a');
-      s+=box(centerX-50,y+10,100,22,'(none)','','leaf');
-    }
-  }
-  placeThemes(support, cx-W*0.22, 148, 'pos');
-  placeThemes(oppose, cx+W*0.22, 148, 'neg');
-  s+='<text x="12" y="'+(H-8)+'" fill="#9aa3b2" font-size="10">Learned representation · top = class · green = pushes up · red = pushes down</text>';
-  return s+'</svg>';
+function conceptCard(theme, tone){
+  const good=tone==='good';
+  const chips=theme.seconds.slice(0,4).map(s=>'<span class="cochip">'+esc(s.label)+'</span>').join('');
+  const meta=theme.n+' learned pattern'+(theme.n===1?'':'s')+' merged here';
+  const extra=chips ? '<div class="cochips"><span class="cochip">often with</span>'+chips+'</div>' : '<div class="cochips"><span class="cochip">standalone signal</span></div>';
+  return '<div class="concept-card '+(good?'good':'bad')+'">'+
+    '<div class="ctitle">'+(good?'Look for: ':'Avoid / subtract: ')+esc(theme.label)+'</div>'+
+    '<div class="cmeta">'+meta+' · strength ~'+Math.round(theme.weight)+'</div>'+
+    extra+
+  '</div>';
 }
 
 function renderGlobalSignatureCard(sig){
+  const tree=sig.tree;
+  const support=tree.support.slice(0,5);
+  const oppose=tree.oppose.slice(0,4);
+  const supportHtml=support.length
+    ? support.map(t=>conceptCard(t,'good')).join('')
+    : '<div class="muted">No strong supporting concepts found.</div>';
+  const opposeHtml=oppose.length
+    ? oppose.map(t=>conceptCard(t,'bad')).join('')
+    : '<div class="muted">No strong opposing concepts found.</div>';
   const fpHtml=sig.fp.map(c=>'<span class="fpchip '+esc(c.kind)+'">'+esc(c.text)+'</span>').join('')||'<span class="muted">no fingerprint yet</span>';
-  const treeSvg=globalLearnedTreeSvg(sig.clsIdx);
   return '<div class="gsig" data-cls="'+esc(sig.cls)+'">'+
     '<div class="gsig-hd"><div class="gtitle">'+esc(sig.cls)+'</div>'+
-    '<div class="gmeta">'+sig.nPos+' supporting · '+sig.nNeg+' opposing · merged into one tree</div></div>'+
+    '<div class="gmeta">'+sig.nPos+' supporting clauses · '+sig.nNeg+' opposing clauses · merged into human concepts</div></div>'+
     '<div class="gsig-bd">'+
-      '<div class="gtree-wrap">'+treeSvg+'</div>'+
-      '<details class="gsig-details"><summary>Text summary &amp; fingerprint</summary>'+
+      '<div class="concept-tree">'+
+        '<div class="concept-root">'+
+          '<div class="eyebrow">learned representation</div>'+
+          '<div class="main">'+esc(sig.cls)+'</div>'+
+          '<div class="plain">To recognize this class, the model combines green evidence and subtracts red evidence.</div>'+
+        '</div>'+
+        '<div class="concept-split">'+
+          '<div class="concept-lane good">'+
+            '<div class="lane-title good">Green side: what the model learned to look for</div>'+
+            '<div class="lane-help">If these concepts appear in a row, they add votes for <b>'+esc(sig.cls)+'</b>.</div>'+
+            supportHtml+
+          '</div>'+
+          '<div class="concept-lane bad">'+
+            '<div class="lane-title bad">Red side: what makes the model doubt this class</div>'+
+            '<div class="lane-help">If these concepts appear, they subtract votes from <b>'+esc(sig.cls)+'</b>.</div>'+
+            opposeHtml+
+          '</div>'+
+        '</div>'+
+      '</div>'+
+      '<details class="gsig-details"><summary>Show compact text summary</summary>'+
         '<div class="gone" style="margin-top:8px">'+sig.sentence+'</div>'+
         '<div class="gsig-fp" style="margin-top:8px">'+fpHtml+'</div>'+
         '<div class="gstruct" style="margin-top:8px">'+sig.struct+'</div>'+
@@ -1633,41 +1630,26 @@ function renderGlobalSignatureCard(sig){
     '</div></div>';
 }
 
-let globalState={query:'', focusOne:false, focusIdx:0};
+let globalState={focusIdx:0};
 
 function setupGlobal(){
-  const sr=$('#globalSearch');
   const fc=$('#globalFocusClass');
   if(ENGINE && fc){
     fc.innerHTML=ENGINE.classes.map((c,i)=>'<option value="'+i+'">'+esc(c)+'</option>').join('');
+    fc.value=String(globalState.focusIdx);
   }
-  if(!sr || sr._wired) return;
-  sr._wired=true;
-  sr.oninput=()=>{ globalState.query=sr.value; renderGlobal(); };
-  $('#globalFocusOne').onchange=e=>{
-    globalState.focusOne=e.target.checked;
-    fc.classList.toggle('hidden', !globalState.focusOne);
-    renderGlobal();
-  };
+  if(!fc || fc._wired) return;
+  fc._wired=true;
   fc.onchange=()=>{ globalState.focusIdx=+fc.value; renderGlobal(); };
 }
 
 function renderGlobal(){
   if(!ENGINE || !CLAUSES.length){ $('#globalGrid').innerHTML=''; return; }
-  const q=globalState.query.trim().toLowerCase();
-  let sigs=ENGINE.classes.map((_,i)=>buildClassGlobalSignature(i))
-    .filter(s=>!q || String(s.cls).toLowerCase().includes(q));
-  if(globalState.focusOne && sigs.length){
-    const pick=ENGINE.classes[globalState.focusIdx];
-    sigs=sigs.filter(s=>String(s.cls)===String(pick));
-    if(!sigs.length) sigs=[buildClassGlobalSignature(globalState.focusIdx)];
-  }
+  const sig=buildClassGlobalSignature(globalState.focusIdx);
   $('#globalNote').textContent = COMP && COMP.clauseFire
-    ? sigs.length+' tree diagram'+(sigs.length===1?'':'s')+' · weighted from '+COMP.nSamples+' samples'
-    : sigs.length+' tree diagram'+(sigs.length===1?'':'s')+' · from rule bank';
-  $('#globalGrid').innerHTML = sigs.length
-    ? sigs.map(renderGlobalSignatureCard).join('')
-    : '<div class="panel forest-empty">No class matches.</div>';
+    ? 'weighted from '+COMP.nSamples+' loaded samples'
+    : 'from the trained rule bank';
+  $('#globalGrid').innerHTML = renderGlobalSignatureCard(sig);
 }
 
 // Per-sample "learning story" — themes, not rule enumeration.

@@ -14,13 +14,10 @@ booleanisation, and compare binarisers and engines side by side.
 - **See every rule.** Each clause is shown in plain language: which features
   must be high or low, the thresholds, and the votes it casts for or against a
   class. Self-contradicting (impossible) conditions are flagged and explained.
-- **Learn what it discovered.** The **Learn** tab folds hundreds of patterns into
-  class profiles (what readings matter), feature couplings (what moves together),
-  and a 2D decision landscape — without reading rules one by one.
-- **Pattern trees.** The **Trees** tab shows **one tree per class** — what pushes
-  that class up (➕) or down (➖), grouped by learned themes, not rule-by-rule.
-- **Global signatures.** The **Global** tab draws a **tree diagram per class** — learned
-  representation merged from all rules (FOR / AGAINST branches, theme families, co-features).
+- **See what the model learned.** The **Learned Representation** tab folds all
+  clauses for one class into a human-readable concept tree: green branches show
+  what the model looks for, red branches show what argues against the class, and
+  child chips show features learned together.
 - **Trace any sample.** Click a sample for a fully-visual decision path: the
   readings, the thermometer bits they set, which clauses fired, the per-class
   vote chart, and the final prediction — with per-condition gauges.
