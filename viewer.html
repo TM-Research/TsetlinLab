@@ -1701,7 +1701,7 @@ let treeState={query:'', openAll:false};
 function featureDirectionLabel(feat, kind){
   if(kind==='hi') return 'high '+feat;
   if(kind==='lo') return 'low '+feat;
-  if(kind==='band') return feat+' in a middle band';
+  if(kind==='band') return feat+' between learned thresholds';
   return feat;
 }
 
@@ -1711,12 +1711,36 @@ function inferFeatureKindInTheme(onCount, offCount){
   return 'lo';
 }
 
+function medianNum(vals){
+  if(!vals || !vals.length) return null;
+  const a=vals.slice().sort((x,y)=>x-y);
+  return a[Math.floor(a.length/2)];
+}
+
+function learnedRangeLabel(feat, onVals, offVals){
+  const onMed=medianNum(onVals), offMed=medianNum(offVals);
+  const hasOn=Number.isFinite(onMed), hasOff=Number.isFinite(offMed);
+  if(hasOn && hasOff){
+    if(onMed < offMed){
+      return {kind:'band', text: feat+' in ['+fmtNum(onMed)+', '+fmtNum(offMed)+')'};
+    }
+    // contradictory/mixed threshold case: still show numbers explicitly.
+    return {kind:'band', text: feat+' around '+fmtNum((onMed+offMed)/2)+' (mixed thresholds)'};
+  }
+  if(hasOn) return {kind:'hi', text: feat+' \u2265 '+fmtNum(onMed)};
+  if(hasOff) return {kind:'lo', text: feat+' < '+fmtNum(offMed)};
+  return {kind:'neutral', text: feat};
+}
+
 // Group clauses into theme branches for one class tree.
 function buildClassPatternTree(clsIdx){
   const cls=ENGINE.classes[clsIdx];
   const support={}, oppose={};
   const bucket=(map, key)=>{
-    if(!map[key]) map[key]={feat:key, weight:0, n:0, leadOn:0, leadOff:0, seconds:{}};
+    if(!map[key]) map[key]={
+      feat:key, weight:0, n:0, leadOn:0, leadOff:0,
+      leadOnVals:[], leadOffVals:[], seconds:{}
+    };
     return map[key];
   };
   ENGINE.clauses.forEach((eng,ci)=>{
@@ -1731,26 +1755,29 @@ function buildClassPatternTree(clsIdx){
     node.weight+=w; node.n++;
     conds.forEach(cd=>{
       if(cd.feature===lead.feature){
-        if(cd.state==='on') node.leadOn++; else node.leadOff++;
+        if(cd.state==='on'){ node.leadOn++; node.leadOnVals.push(+cd.thr); }
+        else { node.leadOff++; node.leadOffVals.push(+cd.thr); }
         return;
       }
       const sk=cd.feature;
-      if(!node.seconds[sk]) node.seconds[sk]={feat:sk, weight:0, n:0, on:0, off:0};
+      if(!node.seconds[sk]) node.seconds[sk]={feat:sk, weight:0, n:0, on:0, off:0, onVals:[], offVals:[]};
       const s=node.seconds[sk];
       s.weight+=w; s.n++;
-      if(cd.state==='on') s.on++; else s.off++;
+      if(cd.state==='on'){ s.on++; s.onVals.push(+cd.thr); }
+      else { s.off++; s.offVals.push(+cd.thr); }
     });
   });
   function finalize(map){
     return Object.values(map).map(t=>{
-      const leadKind=inferFeatureKindInTheme(t.leadOn, t.leadOff);
+      const leadRange=learnedRangeLabel(t.feat, t.leadOnVals, t.leadOffVals);
+      const leadKind=leadRange.kind;
       const secs=Object.values(t.seconds).map(s=>{
-        const kind=inferFeatureKindInTheme(s.on, s.off);
-        return {...s, kind, label:featureDirectionLabel(s.feat, kind)};
+        const rg=learnedRangeLabel(s.feat, s.onVals, s.offVals);
+        return {...s, kind:rg.kind, label:rg.text};
       }).sort((a,b)=>b.weight-a.weight).slice(0,4);
       return {
         feat:t.feat, weight:t.weight, n:t.n, kind:leadKind,
-        label:featureDirectionLabel(t.feat, leadKind), seconds:secs
+        label:leadRange.text, seconds:secs
       };
     }).sort((a,b)=>b.weight-a.weight);
   }
