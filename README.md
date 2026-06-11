@@ -7,7 +7,7 @@ View every rule in plain language, trace any sample end-to-end
 booleanisation, and compare binarisers and engines side by side.
 **Inference runs fully client-side in WebAssembly — no server, no install.**
 
-→ **Live site:** https://Rakesh2109.github.io/TsetlinLab/
+→ **Live site:** https://tm-research.github.io/TsetlinLab/
 
 ## What it does
 
