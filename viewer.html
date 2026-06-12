@@ -223,6 +223,25 @@
   .frvotes{text-align:right;font-weight:700;font-variant-numeric:tabular-nums}
   .frvotes.pos{color:var(--pos)} .frvotes.neg{color:var(--neg)}
   .flow .frfill{animation:barGrow .6s cubic-bezier(.3,0,.2,1) both}
+  /* decision-path deep explorer */
+  .flownode .node, .vrow rect.vbar{transition:filter .12s}
+  .flownode:hover .node{filter:brightness(1.35)}
+  .flownode:hover .node.feat{stroke:var(--acc);stroke-width:1.5}
+  .vrow:hover .vbar{filter:brightness(1.3)}
+  .vrow:hover .vlabel{fill:var(--acc)}
+  .flowdrill{margin-top:10px;border:1px solid var(--line);border-radius:10px;background:#0c0e14;padding:12px 14px;position:relative}
+  .flowdrill.empty{color:var(--mut);font-size:12px;font-style:italic;background:transparent;border-style:dashed;text-align:center;padding:10px}
+  .drill-close{position:absolute;top:8px;right:10px;font-size:11px}
+  .drill-hd{font-size:14px;font-weight:800;margin-bottom:6px;padding-right:60px}
+  .drill-kind{font-size:9px;font-weight:800;letter-spacing:.06em;background:var(--acc);color:var(--bg);
+    border-radius:4px;padding:1px 6px;vertical-align:2px;margin-right:6px}
+  .drill-hd .bigval,.drill-hd .pos,.drill-hd .neg{font-family:ui-monospace,monospace}
+  .drill-hd .bigval{color:var(--acc);font-size:15px;margin-left:4px}
+  .drill-split{display:grid;grid-template-columns:1fr 1fr;gap:14px;align-items:start}
+  @media (max-width:760px){ .drill-split{grid-template-columns:1fr} }
+  .drill-sub{font-size:12px;font-weight:700;margin-bottom:4px}
+  .drill-sub.pos{color:var(--pos)} .drill-sub.neg{color:var(--neg)}
+  .drill-list .frrow{font-size:11.5px}
   .rule .rname{font-weight:600;color:var(--fg)}
   .rulevote{display:inline-block;height:9px;border-radius:2px;vertical-align:middle;margin:0 6px}
   .rulevote.pos{background:var(--pos)} .rulevote.neg{background:var(--neg)}
@@ -255,6 +274,8 @@
   .storycard h4{margin:0 0 6px;font-size:13px;font-weight:600}
   .storycard .pts{font-size:12px;color:var(--pos);font-weight:600}
   .storycard .read{font-size:12px;color:var(--mut);margin-top:4px}
+  .storycard .read .vr{font-family:ui-monospace,monospace;color:var(--fg);background:var(--chip);border:1px solid var(--line);border-radius:4px;padding:0 5px}
+  .storycard .read .metok{color:var(--pos)} .storycard .read .metno{color:var(--warn)}
   /* ---- Trees tab: one tree per class ---- */
   .forest-intro{font-size:13px;line-height:1.65;color:var(--mut);max-width:960px}
   .forest-legend{display:flex;gap:14px;flex-wrap:wrap;font-size:12px;margin:10px 0 0}
@@ -2372,8 +2393,11 @@ function buildSampleStory(fv, res, winIdx, winLbl){
     const lead = (conds.find(cd=>cd.state==='on')||conds[0]);
     if(!lead) return;
     const key=lead.feature;
-    if(!themes[key]) themes[key]={feat:key, pts:0, n:0, met:0, leadKind:lead.state};
+    if(!themes[key]) themes[key]={feat:key, pts:0, n:0, met:0, leadKind:lead.state, leadThr:lead.thr};
     themes[key].pts+=out; themes[key].n++;
+    // keep the strongest (binding-most) lead threshold seen for this feature
+    if(lead.state==='on') themes[key].leadThr=Math.max(themes[key].leadThr, lead.thr);
+    else themes[key].leadThr=Math.min(themes[key].leadThr, lead.thr);
     const v=fv[key];
     if(Number.isFinite(v)){
       const ok = lead.state==='on' ? v>=lead.thr : v<lead.thr;
@@ -2385,11 +2409,14 @@ function buildSampleStory(fv, res, winIdx, winLbl){
   let html='<div class="step"><div class="num">★</div><h3>Main reason this row is '+esc(winLbl)+'</h3>';
   html+='<div class="muted" style="font-size:12px;margin-bottom:8px">These are the strongest learned concepts that matched this row.</div>';
   list.forEach(t=>{
-    const prof=profMap[t.feat];
-    const learned = prof ? prof.label : 'pattern on this feature';
     const v=fv[t.feat];
+    // describe in concrete value-range terms (no "high/low")
+    const op = t.leadKind==='on' ? '≥' : '<';
+    const learnedRange = '<span class="vr">'+esc(t.feat)+' '+op+' '+esc(fmtNum(t.leadThr))+'</span>';
+    const met = Number.isFinite(v) && (t.leadKind==='on' ? v>=t.leadThr : v<t.leadThr);
     const read = Number.isFinite(v)
-      ? ('Your <b>'+esc(t.feat)+'</b> = '+esc(fmtNum(v))+' — the model learned this class '+esc(learned)+'.')
+      ? ('Your <b>'+esc(t.feat)+'</b> = '+esc(fmtNum(v))+' — the model learned this class around '+learnedRange+
+         ' <span class="'+(met?'metok':'metno')+'">('+(met?'your reading is in this range':'reading just outside')+')</span>.')
       : ('Missing reading for <b>'+esc(t.feat)+'</b>.');
     html+='<div class="storycard"><h4>'+esc(t.feat)+'</h4>'+
       '<div class="pts">+'+t.pts+' points from '+t.n+' matching pattern'+(t.n===1?'':'s')+'</div>'+
@@ -2843,6 +2870,8 @@ function firedRulesHtml(fired, winLbl, classes){
 function wireFiredDrilldown(containerSel, fv){
   const host=$(containerSel); if(!host) return;
   host.querySelectorAll('.frrow[data-cid]').forEach(row=>{
+    if(row._wiredDrill) return;        // idempotent: never attach twice
+    row._wiredDrill=true;
     const open=()=>{
       const existing=row.nextElementSibling;
       if(existing && existing.classList.contains('frdetail')){   // toggle off
@@ -2895,9 +2924,13 @@ function voteChartSvg(ranked, classes, winIdx, runIdx){
     const isWin=o.k===winIdx, isRun=o.k===runIdx&&!isWin;
     const cls='vlabel'+(isWin?' win':isRun?' run':'');
     let nm=classes[o.k]; if(nm.length>20) nm=nm.slice(0,19)+'…';
+    // whole row is a clickable group → drill into this class
+    s+='<g class="vrow" data-drill="class" data-k="'+o.k+'" style="cursor:pointer">';
+    s+='<rect x="0" y="'+(y+2)+'" width="'+W+'" height="'+(rowH-4)+'" fill="transparent"/>';
     s+='<text class="'+cls+'" x="'+(labelW-8)+'" y="'+(cy+4)+'" text-anchor="end">'+(isWin?'★ ':'')+esc(nm)+'</text>';
     s+='<rect class="vbar '+(pos?'pos':'neg')+(isWin?' winbar':'')+'" x="'+x0+'" y="'+(y+4)+'" width="'+Math.max(w,0.5)+'" height="'+(rowH-8)+'" rx="2" style="--w:'+Math.max(w,0.5)+'px;transform-box:fill-box;transform-origin:'+(pos?'left':'right')+' center"/>';
     s+='<text class="vval" x="'+(W-6)+'" y="'+(cy+4)+'" text-anchor="end">'+fmtNum(o.v)+'</text>';
+    s+='</g>';
   });
   return s+'</svg>';
 }
@@ -2985,30 +3018,95 @@ function flowDiagramSvg(fv, res, winIdx, runIdx, classes){
     const len=Math.hypot(x2-x1,y2-y1)+Math.abs(y2-y1);
     s+='<path class="edge pos" d="'+d+'" stroke-width="'+(1+3*o.out/maxOut)+'" style="--len:'+len+'"/>';
   });
-  // feature nodes
+  // feature nodes (clickable → drill into this reading)
   feats.forEach(f=>{ const y=fy[f]-15;
+    s+='<g class="flownode" data-drill="feat" data-feat="'+esc(f)+'" style="cursor:pointer">';
     s+='<rect class="node feat" x="'+colX[0]+'" y="'+y+'" width="'+nodeW+'" height="30" rx="6"/>';
     let nm=f; if(nm.length>18)nm=nm.slice(0,17)+'…';
     s+='<text x="'+(colX[0]+8)+'" y="'+(fy[f]-1)+'">'+esc(nm)+'</text>';
-    s+='<text class="sub" x="'+(colX[0]+8)+'" y="'+(fy[f]+11)+'">= '+esc(fmtNum(fv[f]))+'</text>';
+    s+='<text class="sub" x="'+(colX[0]+8)+'" y="'+(fy[f]+11)+'">= '+esc(fmtNum(fv[f]))+'</text></g>';
   });
   if(featOrder.length>feats.length) s+='<text class="sub" x="'+colX[0]+'" y="'+(H-6)+'">+'+(featOrder.length-feats.length)+' more readings</text>';
-  // rule nodes — show the human rule NAME (not the internal id) + its votes
+  // rule nodes — show the human rule NAME (not the internal id) + its votes (clickable)
   ruleSet.forEach((o,ri)=>{ const y=ry[ri]-15;
+    s+='<g class="flownode" data-drill="rule" data-cid="'+esc(o.c.id)+'" data-out="'+o.out+'" data-pos="1" style="cursor:pointer">';
     s+='<rect class="node rulepos" x="'+colX[1]+'" y="'+y+'" width="'+nodeW+'" height="30" rx="6"/>';
     let rn=clauseName(o.c); if(rn.length>24) rn=rn.slice(0,23)+'…';
     s+='<text x="'+(colX[1]+8)+'" y="'+(ry[ri]-1)+'">'+esc(rn)+'</text>';
-    s+='<text class="sub" x="'+(colX[1]+8)+'" y="'+(ry[ri]+11)+'">+'+o.out+' votes → '+esc(classes[o.cls].slice(0,12))+'</text>';
+    s+='<text class="sub" x="'+(colX[1]+8)+'" y="'+(ry[ri]+11)+'">+'+o.out+' votes → '+esc(classes[o.cls].slice(0,12))+'</text></g>';
   });
   if(!ruleSet.length) s+='<text class="sub" x="'+colX[1]+'" y="'+(H/2)+'">no positive rule fired</text>';
-  // class nodes
+  // class nodes (clickable → drill into this class's evidence)
   classNodes.forEach(c=>{ const y=cy[c.k]-17, win=c.k===winIdx;
+    s+='<g class="flownode" data-drill="class" data-k="'+c.k+'" style="cursor:pointer">';
     s+='<rect class="node cls'+(win?' win':'')+'" x="'+colX[2]+'" y="'+y+'" width="'+nodeW+'" height="34" rx="6"/>';
     let nm=c.lbl; if(nm.length>16)nm=nm.slice(0,15)+'…';
     s+='<text x="'+(colX[2]+8)+'" y="'+(cy[c.k]-1)+'">'+(win?'★ ':'')+esc(nm)+'</text>';
-    s+='<text class="sub" x="'+(colX[2]+8)+'" y="'+(cy[c.k]+12)+'">total '+fmtNum(res.scores[c.k])+(win?' — winner':'')+'</text>';
+    s+='<text class="sub" x="'+(colX[2]+8)+'" y="'+(cy[c.k]+12)+'">total '+fmtNum(res.scores[c.k])+(win?' — winner':'')+'</text></g>';
   });
   return s+'</svg>';
+}
+
+// ===========================================================================
+//  DECISION-PATH DEEP EXPLORER — drill into any node of the flow / scoreboard.
+//  These render into #flowDrill; they take the current sample's fv + res so the
+//  breakdown is exact for this row. Called from click handlers wired in showSample.
+// ===========================================================================
+function drillRule(cid, fv, res){
+  const clause=CLAUSES.find(x=>String(x.id)===String(cid)); if(!clause) return '';
+  const co=res.clauseOut[clause.id]||{out:0};
+  const positive=clause.polarity==='positive';
+  return '<div class="drill-hd"><span class="drill-kind">RULE</span> '+esc(clauseName(clause))+
+    ' <span class="muted tech">'+clauseTag(clause)+'</span></div>'+
+    '<div class="muted" style="font-size:12px;margin-bottom:6px">Votes <b class="'+(positive?'pos':'neg')+'">'+(positive?'for':'against')+' '+esc(String(clause.class))+'</b> on this sample. Each condition below shows your reading against the learned threshold.</div>'+
+    ruleCard(clause, fv, co.out||0, positive, true);
+}
+
+function drillClass(k, fv, res){
+  const lbl=ENGINE.classes[k];
+  const firedPos=CLAUSES.filter(c=>String(c.class)===lbl && c.polarity==='positive' && res.clauseOut[c.id].out>0)
+    .map(c=>({c,out:res.clauseOut[c.id].out})).sort((a,b)=>b.out-a.out);
+  const firedNeg=CLAUSES.filter(c=>String(c.class)===lbl && c.polarity==='negative' && res.clauseOut[c.id].out>0)
+    .map(c=>({c,out:res.clauseOut[c.id].out})).sort((a,b)=>b.out-a.out);
+  const pos=firedPos.reduce((a,o)=>a+o.out,0), neg=firedNeg.reduce((a,o)=>a+o.out,0);
+  const listFor=firedPos.length? firedRulesHtml(firedPos.map(o=>({c:o.c,out:o.out})), lbl, ENGINE.classes) : '<div class="muted">No supporting rule fired.</div>';
+  const listAg =firedNeg.length? firedRulesHtml(firedNeg.map(o=>({c:o.c,out:o.out})), lbl, ENGINE.classes) : '<div class="muted">No opposing rule fired.</div>';
+  return '<div class="drill-hd"><span class="drill-kind">CLASS</span> '+esc(lbl)+
+    ' <span class="muted" style="font-weight:400;font-size:12px">— final score '+fmtNum(res.scores[k])+'</span></div>'+
+    '<div class="drill-split">'+
+      '<div><div class="drill-sub pos">+'+fmtNum(pos)+' from '+firedPos.length+' supporting rule'+(firedPos.length===1?'':'s')+'</div><div class="drill-list" data-drilllist="for">'+listFor+'</div></div>'+
+      '<div><div class="drill-sub neg">−'+fmtNum(neg)+' from '+firedNeg.length+' opposing rule'+(firedNeg.length===1?'':'s')+'</div><div class="drill-list" data-drilllist="against">'+listAg+'</div></div>'+
+    '</div>'+
+    '<div class="muted" style="font-size:11px;margin-top:6px">Click any rule above to open its conditions.</div>';
+}
+
+function drillFeature(feat, fv, res){
+  const val=fv[feat];
+  const fr=FEATURES.find(f=>f.name===feat);
+  const thrs=(fr&&fr.thresholds&&fr.thresholds.length)?fr.thresholds.slice().sort((a,b)=>a-b):[];
+  // which fired rules reference this feature, and the vote each casts
+  const usingRules=CLAUSES.filter(c=>res.clauseOut[c.id].out>0 && (c.features||[]).includes(feat))
+    .map(c=>({c,out:res.clauseOut[c.id].out, sign:c.polarity==='positive'?1:-1}))
+    .sort((a,b)=>b.out-a.out).slice(0,12);
+  const thrChips=thrs.length? thrs.map(t=>{
+    const crossed = Number.isFinite(val) && val>=t;
+    return '<span class="tchip '+(crossed?'for':'')+'" title="'+(crossed?'your value ≥ this':'your value below this')+'">'+(crossed?'≥ ':'')+esc(fmtNum(t))+'</span>';
+  }).join('') : '<span class="muted">no thresholds</span>';
+  const ruleList=usingRules.length? '<div class="firedrules">'+usingRules.map(o=>{
+    const adds=o.sign>0; const cls=adds?'pos':'neg';
+    let clsName=String(o.c.class); if(clsName.length>14) clsName=clsName.slice(0,13)+'…';
+    return '<div class="frrow" data-cid="'+esc(o.c.id)+'" data-pos="'+(adds?1:0)+'" data-out="'+o.out+'" tabindex="0" role="button" style="cursor:pointer">'+
+      '<div class="frtoggle">▸</div>'+
+      '<div class="frlabel"><span class="frclass">'+esc(clsName)+'</span><span class="rname">'+esc(clauseName(o.c))+'</span></div>'+
+      '<div class="frbar"><div class="frfill '+cls+'" style="--w:60%"></div></div>'+
+      '<div class="frvotes '+cls+'">'+(adds?'+':'−')+o.out+'</div></div>';
+  }).join('')+'</div>' : '<div class="muted">No fired rule references this reading on this sample.</div>';
+  return '<div class="drill-hd"><span class="drill-kind">READING</span> '+esc(feat)+
+    ' <span class="bigval">'+esc(fmtNum(val))+'</span></div>'+
+    '<div class="muted" style="font-size:12px;margin-bottom:4px">Learned thresholds for this feature (green = your value reaches it):</div>'+
+    '<div class="tlm-ticks" style="margin-bottom:8px">'+thrChips+'</div>'+
+    '<div class="muted" style="font-size:12px;margin-bottom:4px">Fired rules that use this reading'+(usingRules.length>=12?' (top 12)':'')+' — click one to open it:</div>'+
+    ruleList;
 }
 
 function showSample(i){
@@ -3046,8 +3144,10 @@ function showSample(i){
   // ---- STEP 1: the decision-flow diagram (readings → rules → class vote) ----
   html+='<div class="step"><div class="num">1</div><h3>Decision flow</h3>';
   html+='<div class="muted" style="font-size:12px;margin-bottom:4px">Input values activate learned patterns. Those patterns vote for classes. The class with the most points wins.</div>';
+  html+='<div class="drillhint">🔬 <b>Click any box</b> in the diagram to study it: a <b>reading</b> shows its thresholds and the rules it feeds, a <b>rule</b> opens its conditions, a <b>class</b> breaks down all its votes.</div>';
   html+=flowDiagramSvg(fv, res, winIdx, runner.k!==winIdx?runner.k:null, classes);
   html+='<div class="leg"><span><i style="background:#3a4a6a"></i> reading → rule</span><span><i style="background:var(--pos)"></i> rule → class (thicker = more points)</span><span><i style="background:#1a2417;border:1px solid var(--pos)"></i> winning class</span></div>';
+  html+='<div id="flowDrill" class="flowdrill empty">Pick any box above to dig into it.</div>';
   html+='</div>';
 
   // ---- STEP 2: rules that fired, as a labelled vote-bar list ----
@@ -3080,7 +3180,9 @@ function showSample(i){
   const showN=Math.min(TOP_CLASSES, ranked.length);
   html+='<div class="step"><div class="num">4</div><h3>Scoreboard (all classes)</h3>';
   html+='<div class="muted" style="font-size:12px;margin-bottom:4px">Right/green means support. Left/red means opposition. The highest final score wins.</div>';
+  html+='<div class="drillhint">🔬 <b>Click any class row</b> to break down every rule that voted for and against it on this sample.</div>';
   html+='<div id="scoreBars">'+voteChartSvg(ranked.slice(0,showN), classes, winIdx, runner.k)+'</div>';
+  html+='<div id="scoreDrill" class="flowdrill empty">Pick a class above to see its full vote breakdown.</div>';
   if(ranked.length>showN) html+='<button class="linklike" id="moreScores">show all '+ranked.length+' classes…</button>';
   html+='</div>';
 
@@ -3136,13 +3238,46 @@ function showSample(i){
   $('#predDetail').innerHTML='<h2>2) Decision path'+replay+'</h2>'+html;
   // wire progressive-disclosure buttons
   if($('#moreFiredWin')) $('#moreFiredWin').onclick=()=>{ $('#firedRules').innerHTML=firedRulesHtml(firedWin, winLbl, classes); $('#moreFiredWin').remove(); wireFiredDrilldown('#firedRules', fv); };
-  if($('#moreScores')) $('#moreScores').onclick=()=>{ $('#scoreBars').innerHTML=voteChartSvg(ranked, classes, winIdx, runner.k); $('#moreScores').remove(); };
+  if($('#moreScores')) $('#moreScores').onclick=()=>{ $('#scoreBars').innerHTML=voteChartSvg(ranked, classes, winIdx, runner.k); $('#moreScores').remove(); wireFlowDrill(fv, res); };
   if($('#moreWin')) $('#moreWin').onclick=()=>{ $('#winRules').innerHTML=winCards.map(o=>ruleCard(o.c,fv,o.out,true)).join(''); $('#moreWin').remove(); };
   if($('#replayFlow')) $('#replayFlow').onclick=()=>showSample(i);
   // wire interactive click-to-drill-down on the fired-rule lists
   wireFiredDrilldown('#firedRules', fv);
   wireFiredDrilldown('#firedAll', fv);
+  // wire deep explorer: clicking any flow box or scoreboard row drills in
+  wireFlowDrill(fv, res);
   animateFlow();
+}
+
+// Wire the decision-path deep explorer: flow-diagram boxes render into
+// #flowDrill, scoreboard rows render into #scoreDrill. Any rule list produced
+// inside a drill panel is itself made click-to-expand.
+function wireFlowDrill(fv, res){
+  const open=(kind, ds, panelSel)=>{
+    const panel=$(panelSel); if(!panel) return;
+    let h='';
+    if(kind==='rule') h=drillRule(ds.cid, fv, res);
+    else if(kind==='class') h=drillClass(+ds.k, fv, res);
+    else if(kind==='feat') h=drillFeature(ds.feat, fv, res);
+    if(!h) return;
+    panel.classList.remove('empty');
+    panel.innerHTML='<button class="linklike drill-close" title="close">✕ close</button>'+h;
+    const cl=panel.querySelector('.drill-close'); if(cl) cl.onclick=()=>{ panel.classList.add('empty'); panel.innerHTML=panel.dataset.placeholder||'Pick a box to explore.'; };
+    // make any rule rows inside the drill expandable too
+    panel.querySelectorAll('.drill-list, .firedrules').forEach((_,idx)=>{});
+    wireFiredDrilldown(panelSel+' .drill-list[data-drilllist="for"]', fv);
+    wireFiredDrilldown(panelSel+' .drill-list[data-drilllist="against"]', fv);
+    wireFiredDrilldown(panelSel, fv);     // covers drillFeature's plain firedrules
+    panel.scrollIntoView({block:'nearest', behavior:'smooth'});
+  };
+  // remember placeholder text for restore-on-close
+  ['#flowDrill','#scoreDrill'].forEach(sel=>{ const p=$(sel); if(p && !p.dataset.placeholder) p.dataset.placeholder=p.innerHTML; });
+  $$('#predDetail .flownode').forEach(g=>{
+    g.addEventListener('click',()=>open(g.dataset.drill, g.dataset, '#flowDrill'));
+  });
+  $$('#predDetail .vrow').forEach(g=>{
+    g.addEventListener('click',()=>open('class', g.dataset, '#scoreDrill'));
+  });
 }
 
 // Stagger the decision-path elements so the explanation plays as a flow:
