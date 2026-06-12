@@ -462,11 +462,10 @@
   .littable td.lsat{white-space:nowrap;text-align:center}
   .littable tr.sat td{background:rgba(158,206,106,.06)}
   .littable .yes{color:var(--pos);font-weight:700} .littable .no{color:var(--mut)}
-  /* ---- Explain split: sample list (left) + decision panel (right) ---- */
-  .explain-split{display:grid;grid-template-columns:minmax(320px,38%) 1fr;gap:14px;align-items:start}
-  #predListBox{max-height:80vh;min-width:0}
-  #predDetail{min-width:0;max-height:82vh;overflow:auto;position:sticky;top:10px}
-  @media (max-width:1100px){ .explain-split{grid-template-columns:1fr} #predDetail{position:static;max-height:none} }
+  /* ---- Explain: sample list on top, full-width decision path below ---- */
+  .explain-split{display:flex;flex-direction:column;gap:14px}
+  #predListBox{max-height:42vh;min-width:0}      /* compact picker on top */
+  #predDetail{min-width:0}                        /* full width, grows down */
 </style>
 </head>
 <body>
@@ -754,17 +753,17 @@
           <span class="lbl" id="predCount"></span>
         </div>
         <div class="muted" style="font-size:12px;margin:2px 0 10px">
-          <b>Order:</b> 1) choose a sample on the left, 2) read its decision path on the right.
+          <b>How to use:</b> 1) pick a sample from the list, then 2) its full decision path opens right below.
         </div>
         <div class="explain-split">
           <div class="scrollbox" id="predListBox">
-            <div class="muted" style="padding:8px 10px;border-bottom:1px solid var(--line);font-size:12px"><b>1) Samples</b></div>
+            <div class="muted" style="padding:8px 10px;border-bottom:1px solid var(--line);font-size:12px"><b>1) Pick a sample</b> <span style="font-weight:400">— click a row</span></div>
             <table id="predTable"><thead></thead><tbody></tbody></table>
             <div class="pager" id="predPager"></div>
           </div>
           <div class="panel" id="predDetail">
             <h2>2) Decision path</h2>
-            <p class="muted">After selecting a sample, this panel shows main reason, key evidence, score comparison, and why alternatives lost.</p>
+            <p class="muted">Pick a sample above and its decision path appears here — main reason, key evidence, score comparison, and why the alternatives lost.</p>
           </div>
         </div>
       </div>
@@ -1400,6 +1399,7 @@ function parseCsv(text){
   return {cols,rows};
 }
 let predState={page:0,sel:-1,allCols:false};
+let flowState={showAll:false};   // decision-flow diagram: show all readings or just the top few
 // Wide datasets (e.g. NSL-KDD's 118 features) would make a huge table; show a
 // few feature columns by default, with a "show all feature columns" toggle.
 function shownFeatCols(){ return predState.allCols ? PRED.featCols : PRED.featCols.slice(0, TOP_FEATCOLS); }
@@ -2762,7 +2762,7 @@ function renderPred(){
   $('#predPager').innerHTML = pages>1 ? '<button '+(predState.page<=0?'disabled':'')+' id="pPrev">‹ prev</button> page '+(predState.page+1)+' / '+pages+' <button '+(predState.page>=pages-1?'disabled':'')+' id="pNext">next ›</button>' : '';
   if($('#pPrev')) $('#pPrev').onclick=()=>{predState.page--;renderPred();};
   if($('#pNext')) $('#pNext').onclick=()=>{predState.page++;renderPred();};
-  $$('#predTable tbody tr[data-i]').forEach(tr=>tr.onclick=()=>{ predState.sel=+tr.dataset.i; renderPred(); showSample(+tr.dataset.i); });
+  $$('#predTable tbody tr[data-i]').forEach(tr=>tr.onclick=()=>{ predState.sel=+tr.dataset.i; renderPred(); showSample(+tr.dataset.i, true); });
 }
 
 // Per-feature conditions of a clause, evaluated against a sample (for the path).
@@ -2975,17 +2975,17 @@ function gaugeSvg(cd, value){
 
 // (C) Decision-flow diagram (Sankey-ish): READINGS → RULES → CLASS VOTE → WINNER.
 // Only the firing winner/runner rules are drawn, so it stays readable.
-function flowDiagramSvg(fv, res, winIdx, runIdx, classes){
+function flowDiagramSvg(fv, res, winIdx, runIdx, classes, showAllFeats){
   const winLbl=classes[winIdx], runLbl=runIdx!=null?classes[runIdx]:null;
   const pick=(lbl,pol)=>CLAUSES.filter(c=>String(c.class)===lbl && c.polarity===pol && res.clauseOut[c.id].out>0)
                               .map(c=>({c,out:res.clauseOut[c.id].out})).sort((a,b)=>b.out-a.out).slice(0,4);
   const winRules=pick(winLbl,'positive');
   const runRules=runLbl?pick(runLbl,'positive'):[];
   const ruleSet=winRules.map(o=>({...o,cls:winIdx})).concat(runRules.map(o=>({...o,cls:runIdx})));
-  // features feeding the drawn rules (cap for readability)
+  // features feeding the drawn rules (cap for readability unless asked to show all)
   const featOrder=[];
   ruleSet.forEach(o=>(o.c.featureBands||[]).forEach(b=>{ if(!featOrder.includes(b.feature)) featOrder.push(b.feature); }));
-  const feats=featOrder.slice(0,8);
+  const feats=showAllFeats?featOrder:featOrder.slice(0,8);
   const classNodes=[{k:winIdx,lbl:winLbl}]; if(runIdx!=null&&runIdx!==winIdx) classNodes.push({k:runIdx,lbl:runLbl});
 
   const W=720, colX=[20,250,520], nodeW=170;
@@ -3026,7 +3026,7 @@ function flowDiagramSvg(fv, res, winIdx, runIdx, classes){
     s+='<text x="'+(colX[0]+8)+'" y="'+(fy[f]-1)+'">'+esc(nm)+'</text>';
     s+='<text class="sub" x="'+(colX[0]+8)+'" y="'+(fy[f]+11)+'">= '+esc(fmtNum(fv[f]))+'</text></g>';
   });
-  if(featOrder.length>feats.length) s+='<text class="sub" x="'+colX[0]+'" y="'+(H-6)+'">+'+(featOrder.length-feats.length)+' more readings</text>';
+  if(featOrder.length>feats.length) s+='<text class="sub" x="'+colX[0]+'" y="'+(H-6)+'">'+feats.length+' of '+featOrder.length+' readings shown — use the button below</text>';
   // rule nodes — show the human rule NAME (not the internal id) + its votes (clickable)
   ruleSet.forEach((o,ri)=>{ const y=ry[ri]-15;
     s+='<g class="flownode" data-drill="rule" data-cid="'+esc(o.c.id)+'" data-out="'+o.out+'" data-pos="1" style="cursor:pointer">';
@@ -3109,8 +3109,9 @@ function drillFeature(feat, fv, res){
     ruleList;
 }
 
-function showSample(i){
+function showSample(i, scrollToDetail){
   const r=PRED.rows[i]; if(!r||!ENGINE) return;
+  flowState.showAll=false;   // reset the diagram's reading view for each new sample
   const fv=rowFeatureValues(r);
   const res=evalUnified(fv, true);
   const classes=ENGINE.classes, scores=res.scores;
@@ -3142,10 +3143,12 @@ function showSample(i){
   const winPosFull = CLAUSES.filter(c=>winPos.some(w=>w.id===c.id));
 
   // ---- STEP 1: the decision-flow diagram (readings → rules → class vote) ----
+  const flowRun = runner.k!==winIdx?runner.k:null;
   html+='<div class="step"><div class="num">1</div><h3>Decision flow</h3>';
   html+='<div class="muted" style="font-size:12px;margin-bottom:4px">Input values activate learned patterns. Those patterns vote for classes. The class with the most points wins.</div>';
   html+='<div class="drillhint">🔬 <b>Click any box</b> in the diagram to study it: a <b>reading</b> shows its thresholds and the rules it feeds, a <b>rule</b> opens its conditions, a <b>class</b> breaks down all its votes.</div>';
-  html+=flowDiagramSvg(fv, res, winIdx, runner.k!==winIdx?runner.k:null, classes);
+  html+='<div id="flowWrap">'+flowDiagramSvg(fv, res, winIdx, flowRun, classes, flowState.showAll)+'</div>';
+  html+='<div id="flowToggle"></div>';
   html+='<div class="leg"><span><i style="background:#3a4a6a"></i> reading → rule</span><span><i style="background:var(--pos)"></i> rule → class (thicker = more points)</span><span><i style="background:#1a2417;border:1px solid var(--pos)"></i> winning class</span></div>';
   html+='<div id="flowDrill" class="flowdrill empty">Pick any box above to dig into it.</div>';
   html+='</div>';
@@ -3246,7 +3249,41 @@ function showSample(i){
   wireFiredDrilldown('#firedAll', fv);
   // wire deep explorer: clicking any flow box or scoreboard row drills in
   wireFlowDrill(fv, res);
+  // wire the "show all readings" toggle for the flow diagram
+  renderFlowToggle(fv, res, winIdx, flowRun, classes);
   animateFlow();
+  // bring the decision path into view when the user picks a sample
+  if(scrollToDetail){ const d=$('#predDetail'); if(d) d.scrollIntoView({behavior:'smooth', block:'start'}); }
+}
+
+// Count of readings the flow diagram references (winner + runner positive rules),
+// so the toggle can say "show all N".
+function flowFeatureCount(res, winIdx, runIdx, classes){
+  const winLbl=classes[winIdx], runLbl=runIdx!=null?classes[runIdx]:null;
+  const pick=lbl=>CLAUSES.filter(c=>String(c.class)===lbl && c.polarity==='positive' && res.clauseOut[c.id].out>0)
+    .sort((a,b)=>res.clauseOut[b.id].out-res.clauseOut[a.id].out).slice(0,4);
+  const rules=pick(winLbl).concat(runLbl?pick(runLbl):[]);
+  const set=new Set();
+  rules.forEach(c=>(c.featureBands||[]).forEach(b=>set.add(b.feature)));
+  return set.size;
+}
+
+// Render + wire the readings toggle under the flow diagram. Re-renders only the
+// diagram (not the whole panel) so the rest of the decision path stays put.
+function renderFlowToggle(fv, res, winIdx, runIdx, classes){
+  const host=$('#flowToggle'); if(!host) return;
+  const total=flowFeatureCount(res, winIdx, runIdx, classes);
+  if(total<=8){ host.innerHTML=''; return; }   // nothing hidden, no toggle needed
+  host.innerHTML = flowState.showAll
+    ? '<button class="linklike" id="flowToggleBtn">▴ show fewer readings (top 8)</button>'
+    : '<button class="linklike" id="flowToggleBtn">▾ show all '+total+' readings in the diagram</button>';
+  const btn=$('#flowToggleBtn'); if(!btn) return;
+  btn.onclick=()=>{
+    flowState.showAll=!flowState.showAll;
+    const wrap=$('#flowWrap'); if(wrap){ wrap.innerHTML=flowDiagramSvg(fv, res, winIdx, runIdx, classes, flowState.showAll); }
+    renderFlowToggle(fv, res, winIdx, runIdx, classes);
+    wireFlowDrill(fv, res);   // re-wire clickable boxes on the re-rendered diagram
+  };
 }
 
 // Wire the decision-path deep explorer: flow-diagram boxes render into
