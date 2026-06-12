@@ -329,6 +329,44 @@
   .class-selector-big{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
   .class-selector-big select{min-width:220px;font-weight:700;color:var(--fg)}
   @media (max-width:900px){.concept-split{grid-template-columns:1fr}.concept-split::before,.concept-lane::before{display:none}}
+  /* ---- Threshold Learning Map ---- */
+  .tlm-summary{display:flex;flex-wrap:wrap;gap:10px;margin:0 0 14px}
+  .tlm-stat{flex:1 1 150px;border:1px solid var(--line);border-radius:10px;background:var(--panel2);padding:10px 12px}
+  .tlm-stat .k{font-size:11px;color:var(--mut);text-transform:uppercase;letter-spacing:.04em}
+  .tlm-stat .v{font-size:18px;font-weight:800;margin-top:2px}
+  .tlm-stat .v.pos{color:var(--pos)} .tlm-stat .v.neg{color:var(--neg)} .tlm-stat .v.acc{color:var(--acc)}
+  .tlm-stat .s{font-size:11px;color:var(--mut)}
+  .tlm-lead{margin:0 0 16px;padding:11px 13px;background:#16241a;border:1px solid #33502a;border-radius:8px;font-size:13px;line-height:1.6}
+  .tlm-lead b{color:var(--pos)} .tlm-lead .vr{font-family:ui-monospace,monospace;color:var(--fg)}
+  .tlm-map{display:flex;flex-direction:column;gap:0}
+  .tlm-row{display:grid;grid-template-columns:180px 1fr;gap:14px;align-items:center;padding:9px 0;border-top:1px solid var(--line)}
+  .tlm-row:first-child{border-top:none}
+  .tlm-fname{font-weight:700;font-size:13px;word-break:break-word}
+  .tlm-fmeta{font-size:11px;color:var(--mut);margin-top:2px;font-variant-numeric:tabular-nums}
+  .tlm-fmeta .for{color:var(--pos)} .tlm-fmeta .against{color:var(--neg)}
+  .tlm-line{width:100%;min-width:300px}
+  .tlm-line svg{display:block;width:100%;height:auto}
+  .tlm-line svg text{font-family:ui-monospace,monospace}
+  .tlm-empty{color:var(--mut);font-size:13px;padding:14px;border:1px dashed var(--line);border-radius:10px}
+  @media (max-width:760px){ .tlm-row{grid-template-columns:1fr;gap:4px} .tlm-line{min-width:0} }
+  /* consolidated table */
+  .tlm-tablewrap{margin-top:8px;border:1px solid var(--line);border-radius:12px;overflow:auto;background:var(--panel)}
+  table.tlm-table{width:100%;border-collapse:collapse;font-size:12.5px}
+  table.tlm-table th{position:sticky;top:0;background:var(--panel2);color:var(--mut);font-size:10px;
+    text-transform:uppercase;letter-spacing:.04em;text-align:left;padding:8px 10px;border-bottom:1px solid var(--line);white-space:nowrap}
+  table.tlm-table th.for{color:var(--pos)} table.tlm-table th.against{color:var(--neg)}
+  table.tlm-table td{padding:7px 10px;border-bottom:1px solid var(--line);vertical-align:top}
+  table.tlm-table tr:last-child td{border-bottom:none}
+  table.tlm-table td.feat{font-weight:700;white-space:nowrap}
+  table.tlm-table td.feat .rng{display:block;font-weight:400;font-size:10.5px;color:var(--mut);font-family:ui-monospace,monospace}
+  .vrange{display:inline-block;font-family:ui-monospace,monospace;font-size:11.5px;border:1px solid var(--line);
+    border-radius:5px;padding:1px 7px;margin:2px 4px 2px 0;white-space:nowrap;background:var(--chip)}
+  .vrange.for{border-color:#33502a;background:#13211a;color:var(--pos)}
+  .vrange.against{border-color:#5a2630;background:#1f1417;color:var(--neg)}
+  .vrange .w{opacity:.7;font-size:10px;margin-left:3px}
+  .vrange.dim{opacity:.45}
+  .tlm-none{color:var(--mut);font-style:italic}
+  .tlm-tabhint{font-size:11.5px;color:var(--mut);margin:14px 0 6px}
   /* ---- Encoding tab: one feature -> bits -> literals ---- */
   .enctoolbar{display:flex;gap:14px;align-items:center;flex-wrap:wrap;margin-bottom:10px}
   .encval{font-size:22px;font-weight:700;color:var(--acc);font-variant-numeric:tabular-nums}
@@ -521,19 +559,30 @@
       <div id="learnBody"></div>
     </section>
 
-    <!-- GLOBAL — one merged signature per class (all rules folded into one view) -->
+    <!-- GLOBAL — Threshold Learning Map: every feature's learned value ranges per class -->
     <section id="tab-global" class="hidden">
       <div class="panel">
-        <h2>Visualization of learned representations</h2>
-        <p class="learn-intro">This view answers one question: <b>what did the Tsetlin Machine learn for this class?</b> It folds all clauses into a simple concept tree: the green side shows what the model looks for, the red side shows what pushes the class away, and small chips show feature interactions learned together.</p>
+        <h2>What the model learned — Threshold Learning Map</h2>
+        <p class="learn-intro">Instead of listing hundreds of rules, this view folds every clause into the
+          <b>value ranges</b> the model actually learned. For each feature it shows where, along that feature's
+          range, readings push <b>toward</b> this class and where they push <b>against</b> it — read straight off
+          the learned thresholds (<code>≥&nbsp;t</code> and <code>&lt;&nbsp;t</code>), with no “high/low” guesswork.
+          The consolidated table underneath lists the same evidence as exact numeric ranges.</p>
         <div class="forest-legend" style="margin-top:10px">
-          <span><i class="dot pos"></i> green = evidence the model learned for this class</span>
-          <span><i class="dot neg"></i> red = evidence that argues against this class</span>
-          <span class="muted">each branch merges many clauses into one human concept</span>
+          <span><i class="dot pos"></i> green band = a value range that votes <b>for</b> this class</span>
+          <span><i class="dot neg"></i> red band = a value range that votes <b>against</b> it</span>
+          <span class="muted">▸ marks a learned threshold · band shade = how much evidence sits there</span>
         </div>
         <div class="toolbar class-selector-big" style="margin-top:14px">
-          <span class="lbl">show</span>
+          <span class="lbl">class</span>
           <select id="globalFocusClass"></select>
+          <span class="lbl" style="margin-left:6px">sort</span>
+          <select id="globalSort">
+            <option value="mass">most-learned first</option>
+            <option value="net">strongest support first</option>
+            <option value="split">most contested first</option>
+            <option value="name">A → Z</option>
+          </select>
           <span class="muted" id="globalNote" style="font-size:12px"></span>
         </div>
       </div>
@@ -1698,6 +1747,216 @@ function modelWideTreeSvg(){
   return s+'</svg>';
 }
 
+// ===========================================================================
+//  THRESHOLD LEARNING MAP — the learned-representation view.
+//  Folds every clause for one class into the value RANGES it learned, per
+//  feature, split into evidence FOR vs AGAINST. No "high/low" labels — the
+//  output is concrete numeric ranges read straight off the thresholds.
+//
+//  Semantics (thermometer binariser: each bit = feature ≥ t):
+//    positive clause, literal "≥ t"  -> readings ≥ t vote FOR  this class
+//    positive clause, literal "< t"  -> readings < t vote FOR  this class
+//    negative clause, literal "≥ t"  -> readings ≥ t vote AGAINST
+//    negative clause, literal "< t"  -> readings < t vote AGAINST
+//  Each occurrence weighted by clauseLearnWeight (clamp, or vote-per-fire when
+//  a samples CSV is loaded). Self-contradictory (impossible) bindings skipped.
+// ===========================================================================
+function buildThresholdMap(clsIdx){
+  const acc={};                                   // feat -> {hi:Map(thr->{s,a}), lo:Map(thr->{s,a})}
+  const touch=f=>acc[f]||(acc[f]={hi:new Map(),lo:new Map()});
+  const bump=(m,thr,key,w)=>{ const e=m.get(thr)||{s:0,a:0}; e[key]+=w; m.set(thr,e); };
+  ENGINE.clauses.forEach((eng,ci)=>{
+    if(eng.clsIdx!==clsIdx) return;
+    const c=CLAUSES.find(x=>x.id===eng.id)||eng;
+    const w=clauseLearnWeight(ci,c);
+    const positive=eng.polarity==='positive';
+    thermoConds(c).forEach(cd=>{
+      if(cd.impossible) return;
+      const a=touch(cd.feature);
+      if(cd.state==='on') bump(a.hi, cd.thr, positive?'s':'a', w);  // feature ≥ thr
+      else                bump(a.lo, cd.thr, positive?'s':'a', w);  // feature < thr
+    });
+  });
+  const fByName={}; FEATURES.forEach(f=>fByName[f.name]=f);
+  const thrList=m=>[...m.entries()].map(([thr,v])=>({thr:+thr,support:v.s,against:v.a}))
+    .sort((x,y)=>x.thr-y.thr);
+  const features=Object.keys(acc).map(name=>{
+    const a=acc[name];
+    const sum=m=>{ let s=0,ag=0; m.forEach(v=>{s+=v.s; ag+=v.a;}); return {s,ag}; };
+    const hi=sum(a.hi), lo=sum(a.lo);
+    const fr=fByName[name];
+    return {
+      name, range:(fr&&fr.range)?fr.range.slice():null,
+      hiThrs:thrList(a.hi), loThrs:thrList(a.lo),
+      forMass:hi.s+lo.s, againstMass:hi.ag+lo.ag,
+      net:(hi.s+lo.s)-(hi.ag+lo.ag),
+      mass:hi.s+hi.ag+lo.s+lo.ag,
+    };
+  }).filter(f=>f.mass>1e-9);
+  return {cls:ENGINE.classes[clsIdx], clsIdx, features};
+}
+
+// Order features for display.
+function sortThrFeatures(features, mode){
+  const a=features.slice();
+  if(mode==='net')   a.sort((x,y)=>y.net-x.net);
+  else if(mode==='name') a.sort((x,y)=>x.name.localeCompare(y.name));
+  else if(mode==='split') a.sort((x,y)=>                       // most balanced for/against = most contested
+    (Math.min(y.forMass,y.againstMass)) - (Math.min(x.forMass,x.againstMass)));
+  else a.sort((x,y)=>y.mass-x.mass);                           // 'mass' (default)
+  return a;
+}
+
+// Number-line for one feature: the data range with learned thresholds, the
+// ≥-side and <-side shaded by net (support−against) evidence at that reading.
+function thresholdLineSvg(f){
+  const W=900, H=58, padL=30, padR=30, trackY=26, trackH=14;
+  const x0=padL, x1=W-padR, span=x1-x0;
+  let lo=0, hi=1;
+  if(f.range && f.range[1]>f.range[0]){ lo=f.range[0]; hi=f.range[1]; }
+  else {                                                       // no range: derive from thresholds
+    const ts=[...f.hiThrs,...f.loThrs].map(t=>t.thr);
+    if(ts.length){ lo=Math.min.apply(null,ts); hi=Math.max.apply(null,ts); if(hi===lo){hi=lo+1;} }
+  }
+  const X=v=>x0+span*Math.max(0,Math.min(1,(v-lo)/(hi-lo)));
+  // Build evidence "steps" along the axis. Each ≥-threshold contributes its
+  // net to ALL readings to its right; each <-threshold to all readings left.
+  // We sample the axis at threshold boundaries and shade each segment.
+  const cuts=new Set([lo,hi]);
+  f.hiThrs.forEach(t=>cuts.add(t.thr)); f.loThrs.forEach(t=>cuts.add(t.thr));
+  const xs=[...cuts].filter(v=>v>=lo&&v<=hi).sort((p,q)=>p-q);
+  const netAt=mid=>{
+    let net=0;
+    f.hiThrs.forEach(t=>{ if(mid>=t.thr) net+=(t.support-t.against); }); // ≥t active when reading ≥ t
+    f.loThrs.forEach(t=>{ if(mid< t.thr) net+=(t.support-t.against); }); // <t active when reading < t
+    return net;
+  };
+  let maxAbs=1;
+  const segs=[];
+  for(let i=0;i<xs.length-1;i++){
+    const a=xs[i], b=xs[i+1]; if(b<=a) continue;
+    const net=netAt((a+b)/2);
+    maxAbs=Math.max(maxAbs,Math.abs(net));
+    segs.push({a,b,net});
+  }
+  let s='<svg viewBox="0 0 '+W+' '+H+'" preserveAspectRatio="xMidYMid meet" role="img" aria-label="learned value ranges for '+esc(f.name)+'">';
+  // baseline track
+  s+='<rect x="'+x0+'" y="'+trackY+'" width="'+span+'" height="'+trackH+'" rx="3" fill="#11141c" stroke="var(--line)" stroke-width="0.5"/>';
+  segs.forEach(g=>{
+    const xa=X(g.a), xb=X(g.b); const w=Math.max(0.5,xb-xa);
+    const t=Math.abs(g.net)/maxAbs;
+    let col='transparent';
+    if(g.net>1e-9)      col='rgba(158,206,106,'+(0.18+0.62*t)+')';   // green = for
+    else if(g.net<-1e-9)col='rgba(247,118,142,'+(0.16+0.56*t)+')';  // red = against
+    s+='<rect x="'+xa.toFixed(1)+'" y="'+trackY+'" width="'+w.toFixed(1)+'" height="'+trackH+'" fill="'+col+'"/>';
+  });
+  // threshold ticks + labels (dedupe close labels)
+  const ticks=[...new Set([...f.hiThrs,...f.loThrs].map(t=>t.thr))].sort((p,q)=>p-q);
+  let lastLabelX=-1e9;
+  ticks.forEach(tv=>{
+    const x=X(tv);
+    s+='<line x1="'+x.toFixed(1)+'" y1="'+(trackY-4)+'" x2="'+x.toFixed(1)+'" y2="'+(trackY+trackH+4)+'" stroke="#7f8aa3" stroke-width="0.8"/>';
+    s+='<path d="M'+(x-3).toFixed(1)+' '+(trackY-5)+' L'+(x+3).toFixed(1)+' '+(trackY-5)+' L'+x.toFixed(1)+' '+(trackY-1)+' Z" fill="#9aa3b2"/>';
+    if(x-lastLabelX>42){ s+='<text x="'+x.toFixed(1)+'" y="'+(trackY+trackH+15)+'" text-anchor="middle" fill="#9aa3b2" font-size="9">'+esc(fmtNum(tv))+'</text>'; lastLabelX=x; }
+  });
+  // range end labels
+  s+='<text x="'+x0+'" y="'+(trackY-7)+'" text-anchor="start" fill="#6b7488" font-size="9">'+esc(fmtNum(lo))+'</text>';
+  s+='<text x="'+x1+'" y="'+(trackY-7)+'" text-anchor="end" fill="#6b7488" font-size="9">'+esc(fmtNum(hi))+'</text>';
+  return s+'</svg>';
+}
+
+// Compact human range strings, e.g. "≥ 436" / "< 345", with weight.
+function vrangeChips(thrs, dir, tone, total){
+  // dir: 'hi' -> "≥ t"; 'lo' -> "< t". Keep the strongest few by |weight| for tone.
+  if(!thrs.length) return '<span class="tlm-none">—</span>';
+  const key = tone==='for' ? 'support' : 'against';
+  const rows=thrs.map(t=>({thr:t.thr, w:t[key]})).filter(t=>t.w>1e-9).sort((a,b)=>b.w-a.w);
+  if(!rows.length) return '<span class="tlm-none">—</span>';
+  const top=rows.slice(0,4);
+  const op = dir==='hi' ? '≥' : '<';
+  let html=top.map(t=>{
+    const pct = total>0 ? Math.round(100*t.w/total) : 0;
+    return '<span class="vrange '+tone+'">'+op+' '+esc(fmtNum(t.thr))+
+      '<span class="w">'+(pct>=1?pct+'%':'·')+'</span></span>';
+  }).join('');
+  if(rows.length>top.length) html+='<span class="vrange '+tone+' dim">+'+(rows.length-top.length)+' more</span>';
+  return html;
+}
+
+// One headline sentence for the class, in concrete value-range language.
+function thresholdLead(map){
+  const feats=sortThrFeatures(map.features.filter(f=>f.net>0),'net').slice(0,3);
+  if(!feats.length) return 'For <b>'+esc(map.cls)+'</b>, no single feature range carries net positive evidence — the model separates this class mostly through opposing evidence on other classes.';
+  const parts=feats.map(f=>{
+    // pick the dominant supporting direction for this feature
+    const hiW=f.hiThrs.reduce((s,t)=>s+t.support,0), loW=f.loThrs.reduce((s,t)=>s+t.support,0);
+    let chip;
+    if(hiW>=loW && f.hiThrs.length){ const t=f.hiThrs.slice().sort((a,b)=>b.support-a.support)[0]; chip='<span class="vr">'+esc(f.name)+' ≥ '+esc(fmtNum(t.thr))+'</span>'; }
+    else if(f.loThrs.length){ const t=f.loThrs.slice().sort((a,b)=>b.support-a.support)[0]; chip='<span class="vr">'+esc(f.name)+' &lt; '+esc(fmtNum(t.thr))+'</span>'; }
+    else chip='<span class="vr">'+esc(f.name)+'</span>';
+    return chip;
+  });
+  return 'To recognise <b>'+esc(map.cls)+'</b>, the model mainly looks for readings like '+parts.join(', ')+
+    ' — these are the value ranges with the most evidence voting <b>for</b> the class.';
+}
+
+// Render the full Threshold Learning Map + consolidated table for one class.
+function renderThresholdMap(clsIdx, sortMode){
+  const map=buildThresholdMap(clsIdx);
+  if(!map.features.length){
+    return '<div class="gsig"><div class="gsig-bd"><div class="tlm-empty">This class has no usable learned thresholds (every clause was empty or self-contradictory).</div></div></div>';
+  }
+  const feats=sortThrFeatures(map.features, sortMode);
+  const totFor=map.features.reduce((s,f)=>s+f.forMass,0);
+  const totAg =map.features.reduce((s,f)=>s+f.againstMass,0);
+  const nFor=map.features.filter(f=>f.net>0).length, nAg=map.features.filter(f=>f.net<0).length;
+  // summary stats
+  const stats=
+    '<div class="tlm-summary">'+
+    '<div class="tlm-stat"><div class="k">features used</div><div class="v acc">'+map.features.length+'</div><div class="s">have at least one learned threshold</div></div>'+
+    '<div class="tlm-stat"><div class="k">net votes for</div><div class="v pos">'+nFor+'</div><div class="s">features whose ranges mostly support</div></div>'+
+    '<div class="tlm-stat"><div class="k">net votes against</div><div class="v neg">'+nAg+'</div><div class="s">features whose ranges mostly oppose</div></div>'+
+    '<div class="tlm-stat"><div class="k">evidence balance</div><div class="v">'+Math.round(100*totFor/Math.max(1,totFor+totAg))+'%</div><div class="s">share of learned evidence voting for</div></div>'+
+    '</div>';
+  // number-line map
+  let rows='';
+  feats.forEach(f=>{
+    const meta='<span class="for">for '+fmtNum(Math.round(f.forMass))+'</span> · '+
+               '<span class="against">against '+fmtNum(Math.round(f.againstMass))+'</span>'+
+               (f.range?(' · '+fmtNum(f.range[0])+'…'+fmtNum(f.range[1])):'');
+    rows+='<div class="tlm-row"><div><div class="tlm-fname">'+esc(f.name)+'</div><div class="tlm-fmeta">'+meta+'</div></div>'+
+          '<div class="tlm-line">'+thresholdLineSvg(f)+'</div></div>';
+  });
+  const mapHtml='<div class="tlm-map">'+rows+'</div>';
+  // consolidated table
+  const tblRows=feats.map(f=>{
+    const rng=f.range?('<span class="rng">'+fmtNum(f.range[0])+' … '+fmtNum(f.range[1])+'</span>'):'';
+    return '<tr>'+
+      '<td class="feat">'+esc(f.name)+rng+'</td>'+
+      '<td>'+vrangeChips(f.hiThrs,'hi','for',f.forMass)+'</td>'+
+      '<td>'+vrangeChips(f.loThrs,'lo','for',f.forMass)+'</td>'+
+      '<td>'+vrangeChips(f.hiThrs,'hi','against',f.againstMass)+'</td>'+
+      '<td>'+vrangeChips(f.loThrs,'lo','against',f.againstMass)+'</td>'+
+    '</tr>';
+  }).join('');
+  const table=
+    '<div class="tlm-tabhint">Consolidated thresholds for <b>'+esc(map.cls)+'</b> — every feature with the learned <code>≥</code> and <code>&lt;</code> value ranges, split into evidence that votes <span style="color:var(--pos)">for</span> the class and evidence that votes <span style="color:var(--neg)">against</span> it. Percentages are each range\'s share of that feature\'s for / against evidence.</div>'+
+    '<div class="tlm-tablewrap"><table class="tlm-table"><thead><tr>'+
+      '<th>feature</th>'+
+      '<th class="for">supports if ≥</th><th class="for">supports if &lt;</th>'+
+      '<th class="against">opposes if ≥</th><th class="against">opposes if &lt;</th>'+
+    '</tr></thead><tbody>'+tblRows+'</tbody></table></div>';
+  return '<div class="gsig" data-cls="'+esc(map.cls)+'">'+
+    '<div class="gsig-hd"><div class="gtitle">'+esc(map.cls)+'</div>'+
+    '<div class="gmeta">'+map.features.length+' features · folded from every clause for this class into learned value ranges</div></div>'+
+    '<div class="gsig-bd">'+
+      '<div class="tlm-lead">'+thresholdLead(map)+'</div>'+
+      stats+
+      mapHtml+
+      table+
+    '</div></div>';
+}
+
 function renderGlobalSignatureCard(sig){
   const tree=sig.tree;
   const support=tree.support.slice(0,5);
@@ -1742,35 +2001,56 @@ function renderGlobalSignatureCard(sig){
     '</div></div>';
 }
 
-let globalState={focusIdx:0};
+let globalState={focusIdx:0, sortMode:'mass'};
 
 function setupGlobal(){
   const fc=$('#globalFocusClass');
   if(ENGINE && fc){
-    fc.innerHTML='<option value="-1">All classes (one big tree)</option>'+
+    fc.innerHTML='<option value="-1">All classes (overview)</option>'+
       ENGINE.classes.map((c,i)=>'<option value="'+i+'">'+esc(c)+'</option>').join('');
+    // default to the first real class so the map is shown immediately
+    if(globalState.focusIdx===0 && ENGINE.classes.length) globalState.focusIdx=0;
     fc.value=String(globalState.focusIdx);
   }
-  if(!fc || fc._wired) return;
-  fc._wired=true;
-  fc.onchange=()=>{ globalState.focusIdx=+fc.value; renderGlobal(); };
+  const sc=$('#globalSort');
+  if(sc) sc.value=globalState.sortMode;
+  if(fc && !fc._wired){ fc._wired=true;
+    fc.onchange=()=>{ globalState.focusIdx=+fc.value; renderGlobal(); }; }
+  if(sc && !sc._wired){ sc._wired=true;
+    sc.onchange=()=>{ globalState.sortMode=sc.value; renderGlobal(); }; }
+}
+
+// Compact cross-class overview: each class's headline + its strongest few
+// supporting value-ranges, all in concrete ≥/< terms.
+function renderThresholdOverview(){
+  const cards=ENGINE.classes.map((cls,ci)=>{
+    const map=buildThresholdMap(ci);
+    const top=sortThrFeatures(map.features.filter(f=>f.net>0),'net').slice(0,5);
+    const chips=top.length? top.map(f=>{
+      const hiW=f.hiThrs.reduce((s,t)=>s+t.support,0), loW=f.loThrs.reduce((s,t)=>s+t.support,0);
+      if(hiW>=loW && f.hiThrs.length){ const t=f.hiThrs.slice().sort((a,b)=>b.support-a.support)[0]; return '<span class="vrange for">'+esc(f.name)+' ≥ '+esc(fmtNum(t.thr))+'</span>'; }
+      if(f.loThrs.length){ const t=f.loThrs.slice().sort((a,b)=>b.support-a.support)[0]; return '<span class="vrange for">'+esc(f.name)+' &lt; '+esc(fmtNum(t.thr))+'</span>'; }
+      return '<span class="vrange for">'+esc(f.name)+'</span>';
+    }).join('') : '<span class="tlm-none">no net-positive ranges</span>';
+    return '<div class="gsig"><div class="gsig-hd"><div class="gtitle">'+esc(cls)+'</div>'+
+      '<div class="gmeta">'+map.features.length+' features used · click this class above for the full map + table</div></div>'+
+      '<div class="gsig-bd"><div class="tlm-lead">'+thresholdLead(map)+'</div>'+
+      '<div style="margin-top:8px">'+chips+'</div></div></div>';
+  }).join('');
+  return cards;
 }
 
 function renderGlobal(){
   if(!ENGINE || !CLAUSES.length){ $('#globalGrid').innerHTML=''; return; }
+  const note = COMP && COMP.clauseFire
+    ? 'weighted by '+COMP.nSamples+' loaded samples'
+    : 'from the trained rule bank (load a samples CSV to weight by real firings)';
+  $('#globalNote').textContent = note;
   if(globalState.focusIdx === -1){
-    $('#globalNote').textContent = 'full model tree from all classes and all rules';
-    $('#globalGrid').innerHTML =
-      '<div class="gsig"><div class="gsig-hd"><div class="gtitle">All classes (one big tree)</div>'+
-      '<div class="gmeta">root = full model · class nodes = outputs · child nodes = strongest learned concept families</div></div>'+
-      '<div class="gsig-bd"><div class="gtree-wrap">'+modelWideTreeSvg()+'</div></div></div>';
+    $('#globalGrid').innerHTML = renderThresholdOverview();
     return;
   }
-  const sig=buildClassGlobalSignature(globalState.focusIdx);
-  $('#globalNote').textContent = COMP && COMP.clauseFire
-    ? 'weighted from '+COMP.nSamples+' loaded samples'
-    : 'from the trained rule bank';
-  $('#globalGrid').innerHTML = renderGlobalSignatureCard(sig);
+  $('#globalGrid').innerHTML = renderThresholdMap(globalState.focusIdx, globalState.sortMode);
 }
 
 // Per-sample "learning story" — themes, not rule enumeration.
