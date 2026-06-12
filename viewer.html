@@ -202,7 +202,17 @@
   .leg i{width:11px;height:11px;border-radius:3px;display:inline-block}
   /* ---- "rules that fired" vote-bar list ---- */
   .firedrules{display:flex;flex-direction:column;gap:5px;margin-top:6px}
-  .frrow{display:grid;grid-template-columns:minmax(150px,40%) 1fr 52px;gap:9px;align-items:center;font-size:12px}
+  .frrow{display:grid;grid-template-columns:14px minmax(140px,38%) 1fr 52px;gap:9px;align-items:center;font-size:12px;
+    cursor:pointer;border-radius:6px;padding:2px 4px;margin:0 -4px;transition:background .12s}
+  .frrow:hover{background:rgba(122,162,247,.08)}
+  .frrow:focus{outline:1px solid var(--acc);outline-offset:0}
+  .frtoggle{color:var(--mut);font-size:11px;transition:transform .12s;text-align:center}
+  .frrow.expanded{background:rgba(122,162,247,.10)}
+  .frrow.expanded .frtoggle{transform:rotate(90deg);color:var(--acc)}
+  .frdetail{margin:2px 0 8px 18px;border-left:2px solid var(--acc);padding-left:10px;animation:barGrow .25s ease both}
+  .frdetail .rule{margin:0}
+  .drillhint{font-size:11.5px;color:var(--acc);background:rgba(122,162,247,.07);border:1px solid #2b3a5e;
+    border-radius:6px;padding:5px 9px;margin:4px 0 8px}
   .frlabel{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
   .frclass{display:inline-block;font-size:10px;font-weight:700;border-radius:4px;padding:0 5px;margin-right:5px;border:1px solid var(--line);background:var(--chip);color:var(--mut)}
   .frrow.win .frclass{color:var(--pos);border-color:#33502a;background:#16241a}
@@ -347,6 +357,12 @@
   .tlm-line{width:100%;min-width:300px}
   .tlm-line svg{display:block;width:100%;height:auto}
   .tlm-line svg text{font-family:ui-monospace,monospace}
+  .tlm-ticks{display:flex;flex-wrap:wrap;gap:3px 4px;align-items:center;margin-top:3px}
+  .tlm-ticks-lbl{font-size:10px;color:var(--mut);text-transform:uppercase;letter-spacing:.04em;margin-right:2px}
+  .tchip{font-family:ui-monospace,monospace;font-size:10.5px;border:1px solid var(--line);border-radius:4px;
+    padding:0 5px;background:var(--chip);color:var(--mut)}
+  .tchip.for{border-color:#33502a;color:#a9d977;background:#13211a}
+  .tchip.against{border-color:#5a2630;color:#e88aa0;background:#1f1417}
   .tlm-empty{color:var(--mut);font-size:13px;padding:14px;border:1px dashed var(--line);border-radius:10px}
   @media (max-width:760px){ .tlm-row{grid-template-columns:1fr;gap:4px} .tlm-line{min-width:0} }
   /* consolidated table */
@@ -367,6 +383,28 @@
   .vrange.dim{opacity:.45}
   .tlm-none{color:var(--mut);font-style:italic}
   .tlm-tabhint{font-size:11.5px;color:var(--mut);margin:14px 0 6px}
+  .tlm-key{display:flex;gap:18px;align-items:center;flex-wrap:wrap;margin-top:12px;
+    border:1px solid var(--line);border-radius:10px;background:#0c0e14;padding:10px 14px}
+  .tlm-key-svg{width:300px;max-width:60vw;height:auto}
+  .tlm-key-txt{display:flex;flex-direction:column;gap:3px;font-size:12px}
+  .tlm-key-txt .dot{width:10px;height:10px;border-radius:50%;display:inline-block;vertical-align:-1px;margin-right:3px}
+  .tlm-key-txt .dot.pos{background:var(--pos)} .tlm-key-txt .dot.neg{background:var(--neg)}
+  /* ---- Feature Teams (interaction graph) ---- */
+  #linksEdges{accent-color:var(--acc);width:120px}
+  .links-grid{display:grid;grid-template-columns:1fr 300px;gap:16px;align-items:start}
+  @media (max-width:900px){ .links-grid{grid-template-columns:1fr} }
+  .links-canvas{border:1px solid var(--line);border-radius:12px;background:#0c0e14;padding:6px;overflow:hidden}
+  .links-canvas svg{display:block;width:100%;height:auto}
+  .links-canvas svg text{font-family:ui-monospace,monospace;user-select:none}
+  .links-canvas svg circle{transition:opacity .12s}
+  .links-canvas svg circle:hover{stroke:var(--warn);stroke-width:2.4}
+  .links-side{border:1px solid var(--line);border-radius:12px;background:var(--panel2);padding:12px;max-height:560px;overflow:auto}
+  .links-side-hd{font-size:13px;margin-bottom:8px;display:flex;justify-content:space-between;align-items:baseline;gap:8px}
+  .links-side .mate{display:flex;flex-direction:column;gap:1px;border-left:3px solid var(--line);padding:5px 0 5px 9px;margin:0 0 7px}
+  .links-side .mate.for{border-left-color:var(--pos)} .links-side .mate.against{border-left-color:var(--neg)}
+  .links-side .mate .mn{font-weight:700;font-size:12.5px}
+  .links-side .mate .mw{font-size:11px;color:var(--mut)}
+  .links-side .mate.for .mw{color:#a9d977} .links-side .mate.against .mw{color:#e88aa0}
   /* ---- Encoding tab: one feature -> bits -> literals ---- */
   .enctoolbar{display:flex;gap:14px;align-items:center;flex-wrap:wrap;margin-bottom:10px}
   .encval{font-size:22px;font-weight:700;color:var(--acc);font-variant-numeric:tabular-nums}
@@ -440,6 +478,7 @@
       <button data-tab="encoding">Encoding</button>
       <button data-tab="clauses">Rules</button>
       <button data-tab="global">Learned Representation</button>
+      <button data-tab="links">Feature Teams</button>
       <button data-tab="activity">Model Behavior</button>
       <button data-tab="predictions">Why This Prediction</button>
     </div>
@@ -568,10 +607,26 @@
           range, readings push <b>toward</b> this class and where they push <b>against</b> it — read straight off
           the learned thresholds (<code>≥&nbsp;t</code> and <code>&lt;&nbsp;t</code>), with no “high/low” guesswork.
           The consolidated table underneath lists the same evidence as exact numeric ranges.</p>
-        <div class="forest-legend" style="margin-top:10px">
-          <span><i class="dot pos"></i> green band = a value range that votes <b>for</b> this class</span>
-          <span><i class="dot neg"></i> red band = a value range that votes <b>against</b> it</span>
-          <span class="muted">▸ marks a learned threshold · band shade = how much evidence sits there</span>
+        <div class="tlm-key">
+          <div class="tlm-key-row">
+            <svg class="tlm-key-svg" viewBox="0 0 360 46" preserveAspectRatio="xMidYMid meet" aria-label="how to read a line">
+              <rect x="6" y="16" width="348" height="14" rx="3" fill="#11141c" stroke="#2b3142" stroke-width="0.6"/>
+              <rect x="6" y="16" width="150" height="14" fill="rgba(247,118,142,0.5)"/>
+              <rect x="210" y="16" width="144" height="14" fill="rgba(158,206,106,0.62)"/>
+              <line x1="180" y1="13" x2="180" y2="37" stroke="#7f8aa3" stroke-width="0.8"/>
+              <path d="M177 11 L183 11 L180 15 Z" fill="#aab3c5"/>
+              <text x="180" y="44" text-anchor="middle" fill="#c3cbd9" font-size="11" font-family="ui-monospace,monospace">436</text>
+              <text x="80" y="11" text-anchor="middle" fill="#e88aa0" font-size="10">votes AGAINST</text>
+              <text x="282" y="11" text-anchor="middle" fill="#a9d977" font-size="10">votes FOR</text>
+              <text x="6" y="11" fill="#6b7488" font-size="9">low values</text>
+              <text x="354" y="11" text-anchor="end" fill="#6b7488" font-size="9">high values</text>
+            </svg>
+          </div>
+          <div class="tlm-key-txt">
+            <span><i class="dot pos"></i> <b>green</b> = readings in this range vote <b>for</b> the class</span>
+            <span><i class="dot neg"></i> <b>red</b> = readings here vote <b>against</b> it</span>
+            <span class="muted">▾ = a learned threshold (its value is printed below it) · darker band = more evidence</span>
+          </div>
         </div>
         <div class="toolbar class-selector-big" style="margin-top:14px">
           <span class="lbl">class</span>
@@ -587,6 +642,36 @@
         </div>
       </div>
       <div id="globalGrid" class="global-grid"></div>
+    </section>
+
+    <!-- LINKS — interactive feature interaction graph ("Feature Teams") -->
+    <section id="tab-links" class="hidden">
+      <div class="panel">
+        <h2>Feature Teams — what the model learned <i>together</i></h2>
+        <p class="learn-intro">Some signals only mean something <b>in combination</b>. This graph draws a dot for every
+          feature and joins two dots when the model repeatedly used them <b>in the same rule</b>. Thicker, brighter
+          lines = a stronger partnership. <b>Click any dot</b> to focus it and see exactly which features it teams up
+          with — pull the controls to show more or fewer pairings, or to keep only the teams that vote for / against the class.</p>
+        <div class="forest-legend" style="margin-top:10px">
+          <span><i class="dot pos"></i> green line = a pairing that mostly votes <b>for</b> this class</span>
+          <span><i class="dot neg"></i> red line = a pairing that mostly votes <b>against</b> it</span>
+          <span class="muted">bigger dot = the feature carries more evidence overall</span>
+        </div>
+        <div class="toolbar class-selector-big" style="margin-top:14px">
+          <span class="lbl">class</span>
+          <select id="linksClass"></select>
+          <span class="lbl" style="margin-left:6px">pairings</span>
+          <input type="range" id="linksEdges" min="6" max="60" step="2" value="24" style="vertical-align:middle">
+          <span class="lbl" style="margin-left:6px">show</span>
+          <select id="linksPol">
+            <option value="all">all teams</option>
+            <option value="for">only teams that support</option>
+            <option value="against">only teams that oppose</option>
+          </select>
+          <span class="muted" id="linksNote" style="font-size:12px"></span>
+        </div>
+      </div>
+      <div id="linksBody"></div>
     </section>
 
     <!-- TREES — one clear tree per class -->
@@ -915,7 +1000,7 @@ function loadAtlas(obj, name){
     $('#drop').classList.add('hidden'); $('#app').classList.remove('hidden');
     setSrcName(name, obj);
     $$('#tabs button[data-tab="bits"]').forEach(b=>b.classList.toggle('hidden', BITS.length===0));
-    renderOverview(); renderFeatures(); renderBits(); setupEncoding(); setupClauses(); setupLearn(); setupGlobal(); setupTrees(); renderLearn(); renderGlobal(); renderTrees(); renderActivityStatic();
+    renderOverview(); renderFeatures(); renderBits(); setupEncoding(); setupClauses(); setupLearn(); setupGlobal(); setupLinks(); setupTrees(); renderLearn(); renderGlobal(); renderLinks(); renderTrees(); renderActivityStatic();
     if(PRED){ recompute(); } else { maybeSwitchPredTab(); }
     // try to bring up a WASM engine in the background; on success it becomes
     // the active inference path and predictions are recomputed through it.
@@ -980,7 +1065,7 @@ else window.addEventListener('load', autoLoad);
 // ---------------------------------------------------------------- tabs
 $$('#tabs button').forEach(b=>b.addEventListener('click',()=>{
   $$('#tabs button').forEach(x=>x.classList.toggle('on', x===b));
-  ['overview','features','bits','encoding','clauses','learn','global','trees','activity','predictions'].forEach(t=>$('#tab-'+t).classList.toggle('hidden', t!==b.dataset.tab));
+  ['overview','features','bits','encoding','clauses','learn','global','links','trees','activity','predictions'].forEach(t=>$('#tab-'+t).classList.toggle('hidden', t!==b.dataset.tab));
 }));
 function gotoTab(name){ const b=$('#tabs button[data-tab="'+name+'"]'); if(b) b.click(); }
 
@@ -1361,7 +1446,7 @@ function recompute(){
   }
   COMP={pred,correct,nact,ai,nCorrect,nLabelled,
         clauseFire,clauseVotes,featUse,sumFired,nSamples:n};
-  renderSummary(); renderPred(); renderLearn(); renderGlobal(); renderTrees(); renderActivity();
+  renderSummary(); renderPred(); renderLearn(); renderGlobal(); renderLinks(); renderTrees(); renderActivity();
   // auto-open the first sample so an explanation is visible immediately
   const first=predFiltered()[0];
   if(first){ predState.sel=first.idx; renderPred(); showSample(first.idx); }
@@ -1477,6 +1562,87 @@ function buildCouplings(clsIdx, topN){
     const [a,b]=k.split('\0');
     return {a,b,w:pairs[k]};
   }).sort((x,y)=>y.w-x.w).slice(0,topN);
+}
+
+// ===========================================================================
+//  FEATURE INTERACTION GRAPH ("Feature Teams")
+//  A plain network: a node per feature, an edge between two features the model
+//  repeatedly learned TOGETHER in the same clause. Edge weight = how much
+//  combined clause strength pairs them; colour = whether those pairings mostly
+//  vote for (green) or against (red) the class. Node size = total evidence the
+//  feature carries. This is the co-occurrence-network idiom (à la Ciruvis / SIG)
+//  — it answers "which signals work as a team", which a per-feature view can't.
+// ===========================================================================
+function buildInteractionGraph(clsIdx){
+  const nodeMass={};                 // feature -> total clause-weight it appears in
+  const pairS={}, pairA={}, pairN={}; // pair -> support / against weight / #clauses
+  ENGINE.clauses.forEach((eng,ci)=>{
+    if(eng.clsIdx!==clsIdx) return;
+    const c=CLAUSES.find(x=>x.id===eng.id)||eng;
+    const w=clauseLearnWeight(ci,c);
+    const positive=eng.polarity==='positive';
+    // distinct, non-impossible features in this clause
+    const feats=[...new Set(thermoConds(c).filter(cd=>!cd.impossible).map(cd=>cd.feature))].sort();
+    feats.forEach(f=>{ nodeMass[f]=(nodeMass[f]||0)+w; });
+    for(let i=0;i<feats.length;i++) for(let j=i+1;j<feats.length;j++){
+      const k=feats[i]+'\0'+feats[j];
+      (positive?pairS:pairA)[k]=((positive?pairS:pairA)[k]||0)+w;
+      pairN[k]=(pairN[k]||0)+1;
+    }
+  });
+  const nodes=Object.keys(nodeMass).map(name=>({name, mass:nodeMass[name]}))
+    .sort((x,y)=>y.mass-x.mass);
+  const edges=Object.keys(pairN).map(k=>{
+    const [a,b]=k.split('\0');
+    const s=pairS[k]||0, ag=pairA[k]||0;
+    return {a,b,s,ag,w:s+ag,n:pairN[k], dir:(s>=ag?'for':'against')};
+  }).sort((x,y)=>y.w-x.w);
+  return {cls:ENGINE.classes[clsIdx], clsIdx, nodes, edges};
+}
+
+// Circular layout SVG of the strongest `maxEdges` co-occurrences. Deterministic
+// (no physics): nodes that appear in the kept edges are placed evenly on a
+// circle, ordered by mass so heavy features sit together.
+function interactionGraphSvg(graph, maxEdges){
+  const top=graph.edges.slice(0, maxEdges);
+  if(!top.length) return '<div class="tlm-empty">This class has no feature that co-occurs with another in any clause — every learned pattern is a single-feature rule.</div>';
+  // nodes that participate in the kept edges
+  const used=new Set(); top.forEach(e=>{ used.add(e.a); used.add(e.b); });
+  const massByName={}; graph.nodes.forEach(n=>massByName[n.name]=n.mass);
+  const nodes=[...used].sort((x,y)=>(massByName[y]||0)-(massByName[x]||0));
+  const nN=nodes.length;
+  const W=900, H=560, cx=W/2, cy=H/2+8, R=Math.min(W,H)/2-118;
+  const pos={};
+  nodes.forEach((name,i)=>{
+    const ang=-Math.PI/2 + 2*Math.PI*i/nN;       // start at top, clockwise
+    pos[name]={x:cx+R*Math.cos(ang), y:cy+R*Math.sin(ang), ang};
+  });
+  const maxW=Math.max.apply(null, top.map(e=>e.w));
+  const maxMass=Math.max(1, ...nodes.map(n=>massByName[n]||0));
+  let s='<svg viewBox="0 0 '+W+' '+H+'" preserveAspectRatio="xMidYMid meet" role="img" aria-label="feature interaction graph for '+esc(graph.cls)+'">';
+  // edges first (under nodes), as gentle arcs toward the centre
+  top.forEach(e=>{
+    const p=pos[e.a], q=pos[e.b]; if(!p||!q) return;
+    const t=e.w/maxW;
+    const col = e.dir==='for' ? 'rgba(158,206,106,' : 'rgba(247,118,142,';
+    const op = (0.18+0.55*t).toFixed(2);
+    const sw = (1+5*t).toFixed(2);
+    // quadratic curve bowed toward centre for readability
+    const mx=(p.x+q.x)/2, my=(p.y+q.y)/2;
+    const bx=mx+(cx-mx)*0.35, by=my+(cy-my)*0.35;
+    s+='<path d="M'+p.x.toFixed(1)+' '+p.y.toFixed(1)+' Q'+bx.toFixed(1)+' '+by.toFixed(1)+' '+q.x.toFixed(1)+' '+q.y.toFixed(1)+'" fill="none" stroke="'+col+op+')" stroke-width="'+sw+'" stroke-linecap="round"/>';
+  });
+  // nodes
+  nodes.forEach(name=>{
+    const p=pos[name]; const m=massByName[name]||0;
+    const r=5+10*Math.sqrt(m/maxMass);
+    s+='<circle cx="'+p.x.toFixed(1)+'" cy="'+p.y.toFixed(1)+'" r="'+r.toFixed(1)+'" fill="#1f2431" stroke="#7aa2f7" stroke-width="1.4"/>';
+    // label outside the circle, aligned by side
+    const right=Math.cos(p.ang)>=-0.01;
+    const lx=p.x+(right?1:-1)*(r+6), ly=p.y+4;
+    s+='<text x="'+lx.toFixed(1)+'" y="'+ly.toFixed(1)+'" text-anchor="'+(right?'start':'end')+'" fill="#e6e8ee" font-size="12">'+esc(name)+'</text>';
+  });
+  return s+'</svg>';
 }
 
 function profileProse(profile){
@@ -1810,7 +1976,7 @@ function sortThrFeatures(features, mode){
 // Number-line for one feature: the data range with learned thresholds, the
 // ≥-side and <-side shaded by net (support−against) evidence at that reading.
 function thresholdLineSvg(f){
-  const W=900, H=58, padL=30, padR=30, trackY=26, trackH=14;
+  const W=900, H=86, padL=34, padR=34, trackY=24, trackH=15;
   const x0=padL, x1=W-padR, span=x1-x0;
   let lo=0, hi=1;
   if(f.range && f.range[1]>f.range[0]){ lo=f.range[0]; hi=f.range[1]; }
@@ -1850,19 +2016,45 @@ function thresholdLineSvg(f){
     else if(g.net<-1e-9)col='rgba(247,118,142,'+(0.16+0.56*t)+')';  // red = against
     s+='<rect x="'+xa.toFixed(1)+'" y="'+trackY+'" width="'+w.toFixed(1)+'" height="'+trackH+'" fill="'+col+'"/>';
   });
-  // threshold ticks + labels (dedupe close labels)
+  // threshold ticks. Always draw a tick MARK at every learned threshold. Print
+  // the numeric label on-axis only where it is visually separable (staggered
+  // across up to 3 rows); where ticks cluster too tightly to label cleanly we
+  // leave the marks and rely on the always-readable chip list below the line
+  // (thresholdTickList) so NO value is ever smeared or lost.
   const ticks=[...new Set([...f.hiThrs,...f.loThrs].map(t=>t.thr))].sort((p,q)=>p-q);
-  let lastLabelX=-1e9;
+  const ROWS=3, ROWH=13, MINGAP=46;
+  const rowLastX=new Array(ROWS).fill(-1e9);
   ticks.forEach(tv=>{
     const x=X(tv);
-    s+='<line x1="'+x.toFixed(1)+'" y1="'+(trackY-4)+'" x2="'+x.toFixed(1)+'" y2="'+(trackY+trackH+4)+'" stroke="#7f8aa3" stroke-width="0.8"/>';
-    s+='<path d="M'+(x-3).toFixed(1)+' '+(trackY-5)+' L'+(x+3).toFixed(1)+' '+(trackY-5)+' L'+x.toFixed(1)+' '+(trackY-1)+' Z" fill="#9aa3b2"/>';
-    if(x-lastLabelX>42){ s+='<text x="'+x.toFixed(1)+'" y="'+(trackY+trackH+15)+'" text-anchor="middle" fill="#9aa3b2" font-size="9">'+esc(fmtNum(tv))+'</text>'; lastLabelX=x; }
+    s+='<path d="M'+(x-3).toFixed(1)+' '+(trackY-5)+' L'+(x+3).toFixed(1)+' '+(trackY-5)+' L'+x.toFixed(1)+' '+(trackY-1)+' Z" fill="#aab3c5"/>';
+    // find a stagger row with room; if none, draw only the tick line (no label)
+    let row=-1; for(let r=0;r<ROWS;r++){ if(x-rowLastX[r]>=MINGAP){ row=r; break; } }
+    if(row>=0){
+      rowLastX[row]=x;
+      const ly=trackY+trackH+11+row*ROWH;
+      s+='<line x1="'+x.toFixed(1)+'" y1="'+(trackY-3)+'" x2="'+x.toFixed(1)+'" y2="'+(trackY+trackH+3+row*ROWH).toFixed(1)+'" stroke="#7f8aa3" stroke-width="0.7"/>';
+      s+='<text x="'+x.toFixed(1)+'" y="'+ly.toFixed(1)+'" text-anchor="middle" fill="#c3cbd9" font-size="10.5">'+esc(fmtNum(tv))+'</text>';
+    } else {
+      s+='<line x1="'+x.toFixed(1)+'" y1="'+(trackY-3)+'" x2="'+x.toFixed(1)+'" y2="'+(trackY+trackH+3)+'" stroke="#7f8aa3" stroke-width="0.7"/>';
+    }
   });
-  // range end labels
-  s+='<text x="'+x0+'" y="'+(trackY-7)+'" text-anchor="start" fill="#6b7488" font-size="9">'+esc(fmtNum(lo))+'</text>';
-  s+='<text x="'+x1+'" y="'+(trackY-7)+'" text-anchor="end" fill="#6b7488" font-size="9">'+esc(fmtNum(hi))+'</text>';
+  s+='<text x="'+x0+'" y="'+(trackY-6)+'" text-anchor="start" fill="#6b7488" font-size="9.5">'+esc(fmtNum(lo))+'</text>';
+  s+='<text x="'+x1+'" y="'+(trackY-6)+'" text-anchor="end" fill="#6b7488" font-size="9.5">'+esc(fmtNum(hi))+'</text>';
   return s+'</svg>';
+}
+
+// Every learned threshold for a feature as small, always-readable chips —
+// green if it gates evidence FOR the class, red if AGAINST (a threshold can do
+// both; we colour by its net at that cut). Guarantees the exact numbers are
+// legible even when the on-axis labels had to be thinned for space.
+function thresholdTickList(f){
+  const byThr={};
+  f.hiThrs.forEach(t=>{ const e=byThr[t.thr]||(byThr[t.thr]={s:0,a:0}); e.s+=t.support; e.a+=t.against; });
+  f.loThrs.forEach(t=>{ const e=byThr[t.thr]||(byThr[t.thr]={s:0,a:0}); e.s+=t.support; e.a+=t.against; });
+  const list=Object.keys(byThr).map(k=>({thr:+k, net:byThr[k].s-byThr[k].a})).sort((x,y)=>x.thr-y.thr);
+  if(!list.length) return '';
+  return '<div class="tlm-ticks"><span class="tlm-ticks-lbl">thresholds:</span>'+
+    list.map(t=>'<span class="tchip '+(t.net>=0?'for':'against')+'">'+esc(fmtNum(t.thr))+'</span>').join('')+'</div>';
 }
 
 // Compact human range strings, e.g. "≥ 436" / "< 345", with weight.
@@ -1925,7 +2117,7 @@ function renderThresholdMap(clsIdx, sortMode){
                '<span class="against">against '+fmtNum(Math.round(f.againstMass))+'</span>'+
                (f.range?(' · '+fmtNum(f.range[0])+'…'+fmtNum(f.range[1])):'');
     rows+='<div class="tlm-row"><div><div class="tlm-fname">'+esc(f.name)+'</div><div class="tlm-fmeta">'+meta+'</div></div>'+
-          '<div class="tlm-line">'+thresholdLineSvg(f)+'</div></div>';
+          '<div class="tlm-line">'+thresholdLineSvg(f)+thresholdTickList(f)+'</div></div>';
   });
   const mapHtml='<div class="tlm-map">'+rows+'</div>';
   // consolidated table
@@ -2051,6 +2243,119 @@ function renderGlobal(){
     return;
   }
   $('#globalGrid').innerHTML = renderThresholdMap(globalState.focusIdx, globalState.sortMode);
+}
+
+// ===========================================================================
+//  FEATURE TEAMS TAB — interactive feature-interaction graph
+// ===========================================================================
+let linksState={focusIdx:0, maxEdges:24, pol:'all', selFeat:null};
+
+function setupLinks(){
+  const fc=$('#linksClass');
+  if(ENGINE && fc){
+    fc.innerHTML=ENGINE.classes.map((c,i)=>'<option value="'+i+'">'+esc(c)+'</option>').join('');
+    fc.value=String(linksState.focusIdx);
+  }
+  const me=$('#linksEdges'); if(me) me.value=String(linksState.maxEdges);
+  const pol=$('#linksPol'); if(pol) pol.value=linksState.pol;
+  if(fc && !fc._wired){ fc._wired=true; fc.onchange=()=>{ linksState.focusIdx=+fc.value; linksState.selFeat=null; renderLinks(); }; }
+  if(me && !me._wired){ me._wired=true; me.oninput=()=>{ linksState.maxEdges=+me.value; renderLinks(); }; }
+  if(pol && !pol._wired){ pol._wired=true; pol.onchange=()=>{ linksState.pol=pol.value; renderLinks(); }; }
+}
+
+// Filter a graph's edges by polarity selection, keep node masses intact.
+function filterGraphEdges(graph){
+  if(linksState.pol==='all') return graph.edges;
+  return graph.edges.filter(e=>e.dir===linksState.pol);
+}
+
+function renderLinks(){
+  const host=$('#linksBody'); if(!host) return;
+  if(!ENGINE || !CLAUSES.length){ host.innerHTML=''; return; }
+  const graph=buildInteractionGraph(linksState.focusIdx);
+  graph.edges=filterGraphEdges(graph);
+  $('#linksNote').textContent = (COMP && COMP.clauseFire)
+    ? 'pairings weighted by '+COMP.nSamples+' loaded samples'
+    : 'pairings from the trained rule bank';
+  const maxE=Math.min(linksState.maxEdges, graph.edges.length);
+  const svg=interactionGraphSvg(graph, maxE);
+  // sidebar: top teammates of the selected feature, else strongest pairs overall
+  let side;
+  if(linksState.selFeat){
+    const f=linksState.selFeat;
+    const mates=graph.edges.filter(e=>e.a===f||e.b===f)
+      .map(e=>({other:e.a===f?e.b:e.a, w:e.w, n:e.n, dir:e.dir}))
+      .sort((x,y)=>y.w-x.w).slice(0,12);
+    side='<div class="links-side-hd"><b>'+esc(f)+'</b>’s teammates'+
+      '<button class="linklike" id="linksClear">clear</button></div>'+
+      (mates.length? mates.map(m=>
+        '<div class="mate '+m.dir+'">'+
+        '<span class="mn">'+esc(m.other)+'</span>'+
+        '<span class="mw">'+(m.dir==='for'?'＋':'－')+' learned together in '+m.n+' rule'+(m.n===1?'':'s')+'</span>'+
+        '</div>').join('')
+        : '<div class="muted">No co-occurring feature for the current filter.</div>');
+  } else {
+    const tops=graph.edges.slice(0,12);
+    side='<div class="links-side-hd"><b>Strongest feature teams</b><span class="muted" style="font-weight:400"> · click a node to focus</span></div>'+
+      (tops.length? tops.map(e=>
+        '<div class="mate '+e.dir+'">'+
+        '<span class="mn">'+esc(e.a)+' + '+esc(e.b)+'</span>'+
+        '<span class="mw">'+(e.dir==='for'?'＋ supports':'－ opposes')+' · '+e.n+' rule'+(e.n===1?'':'s')+'</span>'+
+        '</div>').join('')
+        : '<div class="muted">No feature pairings for the current filter.</div>');
+  }
+  host.innerHTML=
+    '<div class="gsig"><div class="gsig-hd"><div class="gtitle">'+esc(graph.cls)+'</div>'+
+    '<div class="gmeta">showing the '+maxE+' strongest of '+graph.edges.length+' feature pairings · '+graph.nodes.length+' features · click any node to focus its teammates</div></div>'+
+    '<div class="gsig-bd"><div class="links-grid">'+
+      '<div class="links-canvas" id="linksCanvas">'+svg+'</div>'+
+      '<div class="links-side">'+side+'</div>'+
+    '</div></div></div>';
+  // wire interactivity: click a node circle/label to focus it
+  const canvas=$('#linksCanvas');
+  if(canvas){
+    canvas.querySelectorAll('circle,text').forEach((el,i,arr)=>{});
+    // attach by walking text labels (carry the name) and matching circles by index
+    const svgEl=canvas.querySelector('svg');
+    if(svgEl){
+      svgEl.querySelectorAll('text').forEach(t=>{
+        t.style.cursor='pointer';
+        t.addEventListener('click',()=>{ linksState.selFeat=t.textContent; renderLinks(); });
+      });
+      svgEl.querySelectorAll('circle').forEach((c,idx)=>{
+        const label=svgEl.querySelectorAll('text')[idx];
+        if(!label) return;
+        c.style.cursor='pointer';
+        c.addEventListener('click',()=>{ linksState.selFeat=label.textContent; renderLinks(); });
+      });
+    }
+  }
+  const clr=$('#linksClear'); if(clr) clr.onclick=()=>{ linksState.selFeat=null; renderLinks(); };
+  // highlight edges/nodes touching the selected feature
+  if(linksState.selFeat) highlightLinks(linksState.selFeat);
+}
+
+// Dim everything not connected to the focused feature.
+function highlightLinks(feat){
+  const svgEl=$('#linksCanvas svg'); if(!svgEl) return;
+  const labels=[...svgEl.querySelectorAll('text')];
+  const idx=labels.findIndex(t=>t.textContent===feat);
+  const circles=[...svgEl.querySelectorAll('circle')];
+  // mark the focused node
+  labels.forEach((t,i)=>{ t.setAttribute('opacity', t.textContent===feat?'1':'0.32'); if(t.textContent===feat){ t.setAttribute('font-weight','700'); } });
+  circles.forEach((c,i)=>{ const on=labels[i] && labels[i].textContent===feat; c.setAttribute('opacity', on?'1':'0.4'); if(on){ c.setAttribute('stroke','#e0af68'); c.setAttribute('stroke-width','2.4'); } });
+  // edges: keep only those touching the feature bright; need endpoint coords.
+  // We re-derive from the graph rather than parse paths.
+  const graph=buildInteractionGraph(linksState.focusIdx); graph.edges=filterGraphEdges(graph);
+  const top=graph.edges.slice(0, Math.min(linksState.maxEdges, graph.edges.length));
+  const paths=[...svgEl.querySelectorAll('path')];
+  top.forEach((e,i)=>{ if(!paths[i]) return; const on=(e.a===feat||e.b===feat);
+    paths[i].setAttribute('opacity', on?'1':'0.12');
+    if(on) paths[i].setAttribute('stroke-width', (parseFloat(paths[i].getAttribute('stroke-width'))+1.2).toFixed(2));
+  });
+  // also un-dim the connected nodes
+  const mates=new Set(); top.forEach(e=>{ if(e.a===feat)mates.add(e.b); if(e.b===feat)mates.add(e.a); });
+  labels.forEach((t,i)=>{ if(mates.has(t.textContent)){ t.setAttribute('opacity','0.95'); if(circles[i]) circles[i].setAttribute('opacity','0.9'); } });
 }
 
 // Per-sample "learning story" — themes, not rule enumeration.
@@ -2522,7 +2827,8 @@ function firedRulesHtml(fired, winLbl, classes){
     const cls = adds ? 'pos':'neg';
     const w=Math.max(3, o.out/maxV*100);
     let clsName=String(o.c.class); if(clsName.length>14) clsName=clsName.slice(0,13)+'…';
-    return '<div class="frrow'+(forWin&&adds?' win':'')+'">'+
+    return '<div class="frrow'+(forWin&&adds?' win':'')+'" data-cid="'+esc(o.c.id)+'" data-pos="'+(adds?1:0)+'" data-out="'+o.out+'" tabindex="0" role="button" title="click to see why this rule matched">'+
+      '<div class="frtoggle">▸</div>'+
       '<div class="frlabel"><span class="frclass">'+esc(clsName)+'</span>'+
         '<span class="rname">'+esc(clauseName(o.c))+'</span>'+
         '<span class="tech muted"> · '+clauseTag(o.c)+'</span></div>'+
@@ -2530,6 +2836,32 @@ function firedRulesHtml(fired, winLbl, classes){
       '<div class="frvotes '+cls+'">'+sign+o.out+'</div>'+
     '</div>';
   }).join('')+'</div>';
+}
+
+// Wire click-to-drill-down on a fired-rules list: clicking a row expands the
+// full per-condition breakdown (each literal + whether this sample met it).
+function wireFiredDrilldown(containerSel, fv){
+  const host=$(containerSel); if(!host) return;
+  host.querySelectorAll('.frrow[data-cid]').forEach(row=>{
+    const open=()=>{
+      const existing=row.nextElementSibling;
+      if(existing && existing.classList.contains('frdetail')){   // toggle off
+        existing.remove(); row.classList.remove('expanded'); return;
+      }
+      // close any other open detail in this container
+      host.querySelectorAll('.frdetail').forEach(d=>d.remove());
+      host.querySelectorAll('.frrow.expanded').forEach(r=>r.classList.remove('expanded'));
+      const cid=row.dataset.cid;
+      const clause=CLAUSES.find(x=>String(x.id)===String(cid)); if(!clause) return;
+      const out=+row.dataset.out, positive=row.dataset.pos==='1';
+      const det=document.createElement('div');
+      det.className='frdetail';
+      det.innerHTML=ruleCard(clause, fv, out, positive, true);
+      row.after(det); row.classList.add('expanded');
+    };
+    row.addEventListener('click', open);
+    row.addEventListener('keydown', e=>{ if(e.key==='Enter'||e.key===' '){ e.preventDefault(); open(); } });
+  });
 }
 
 // ===========================================================================
@@ -2726,6 +3058,7 @@ function showSample(i){
   const FR_TOP=8;
   html+='<div class="step"><div class="num">2</div><h3>Strongest evidence for '+esc(winLbl)+'</h3>';
   html+='<div class="muted" style="font-size:12px;margin-bottom:2px">These matched patterns gave the biggest positive push to <b>'+esc(winLbl)+'</b>. Longer bars mean stronger impact.</div>';
+  html+='<div class="drillhint">🔍 <b>Click any rule</b> to open it up and see exactly which conditions this sample met (and by how much).</div>';
   html+='<div id="firedRules">'+firedRulesHtml(firedWin.slice(0,FR_TOP), winLbl, classes)+'</div>';
   if(firedWin.length>FR_TOP) html+='<button class="linklike" id="moreFiredWin">show all '+firedWin.length+' evidence rules…</button>';
   html+='<details style="margin-top:6px"><summary>show all '+allFired.length+' fired patterns (advanced)</summary><div style="margin-top:6px" id="firedAll">'+firedRulesHtml(allFired.slice(0,40), winLbl, classes)+(allFired.length>40?'<div class="muted" style="font-size:11px">showing 40 of '+allFired.length+'</div>':'')+'</div></details>';
@@ -2802,10 +3135,13 @@ function showSample(i){
   $('#predDetail').classList.toggle('flow', ANIMATE);
   $('#predDetail').innerHTML='<h2>2) Decision path'+replay+'</h2>'+html;
   // wire progressive-disclosure buttons
-  if($('#moreFiredWin')) $('#moreFiredWin').onclick=()=>{ $('#firedRules').innerHTML=firedRulesHtml(firedWin, winLbl, classes); $('#moreFiredWin').remove(); };
+  if($('#moreFiredWin')) $('#moreFiredWin').onclick=()=>{ $('#firedRules').innerHTML=firedRulesHtml(firedWin, winLbl, classes); $('#moreFiredWin').remove(); wireFiredDrilldown('#firedRules', fv); };
   if($('#moreScores')) $('#moreScores').onclick=()=>{ $('#scoreBars').innerHTML=voteChartSvg(ranked, classes, winIdx, runner.k); $('#moreScores').remove(); };
   if($('#moreWin')) $('#moreWin').onclick=()=>{ $('#winRules').innerHTML=winCards.map(o=>ruleCard(o.c,fv,o.out,true)).join(''); $('#moreWin').remove(); };
   if($('#replayFlow')) $('#replayFlow').onclick=()=>showSample(i);
+  // wire interactive click-to-drill-down on the fired-rule lists
+  wireFiredDrilldown('#firedRules', fv);
+  wireFiredDrilldown('#firedAll', fv);
   animateFlow();
 }
 
